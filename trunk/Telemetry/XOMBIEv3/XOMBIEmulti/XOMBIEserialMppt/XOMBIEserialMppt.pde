@@ -141,6 +141,9 @@ void loop() {
             Serial1.write(buf[i]);
         }
     }
+    //Sends a CAN request to the MPPTs
+    //1110001 (0x710) for Master Request Base ID
+    //mppt_index ranges from 1 to 5 corresponding to the MPPT index
     if (millis() - last_mppt_can > 200) {
         CanMessage msg;
         msg.id = 0x710 + mppt_index;
@@ -150,11 +153,25 @@ void loop() {
         if (mppt_index > 5)
             mppt_index = 1;
     }
+    //Parsing MPPT CAN packet
     if (Can.available()) {
         CanMessage msg;
         Can.recv(Can.available(), msg);
+        //Battery Voltage Level Reached Flag
         char BVLR = msg.data[0] & (1<<7);
-        
-        int Vin = msg 
-    }
+        //Overtemperature Flag
+        char OVT = msg.data[0] & (1<<6);
+        //No Charge Flag
+        char NOC = msg.data[0] & (1<<5);
+        //Undervoltage Flag
+        char UNDV = msg.data[0] & (1<<4);
+        //Input (Array) Voltage
+        int Vin = ((msg.data[0] & 0x3)<<8) | msg.data[1];
+        //Input (Array) Current
+        int Iin = ((msg.data[2] & 0x3)<<8) | msg.data[3];
+        //Output (Battery) Voltage
+        int Vout = ((msg.data[4] & 0x3)<<8) | msg.data[5];
+        //Ambient Temp. in Celsius (steps of 5 degrees Celsius)
+        int Tamb = msg.data[6];
+        }
 }
