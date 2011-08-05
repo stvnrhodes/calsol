@@ -11,6 +11,7 @@
 #include "pitches.h"
 #include "cutoffCanID.h"
 #include "cutoffPindef.h"
+#include <avr/pgmspace.h>
 
 /* State variables */
 
@@ -61,67 +62,67 @@ enum SHUTDOWNREASONS {
   CODING_ERROR
 } shutdownReason;
 
+
+/* Shutdown Reason Error Codes */  
+/* these are stored in program memory to decrease SRAM usage */
+prog_char reason_POWER_LOSS[]          PROGMEM = "Loss of power to cutoff.  Possibly due to bomb switch.";
+prog_char reason_KEY_OFF[]             PROGMEM = "Normal Shutdown.  Key in off position."; 
+prog_char reason_BPS_HEARTBEAT[]       PROGMEM = "Missing BPS heartbeat."; 
+prog_char reason_S_UNDERVOLT[]         PROGMEM = "High voltage line undervoltage."; 
+prog_char reason_S_OVERVOLT[]          PROGMEM = "High voltage line overvoltage."; 
+prog_char reason_S_OVERCURRENT[]       PROGMEM = "High voltage line overcurrent."; 
+prog_char reason_BPS_EMERGENCY_OTHER[] PROGMEM = "Battery Protection System Emergency: Other"; 
+prog_char reason_BPS_UNDERVOLT[]       PROGMEM = "BPS Emergency: Battery Undervoltage"; 
+prog_char reason_BPS_OVERVOLT[]        PROGMEM = "BPS Emergency: Battery Overvoltage"; 
+prog_char reason_BPS_OVERTEMP[]        PROGMEM = "BPS Emergency: Batteries Overtemperature"; 
+prog_char reason_IO_EMERGENCY[]        PROGMEM = "Input Output Boards Emergency."; 
+prog_char reason_CONTROLS_EMERGENCY[]  PROGMEM = "Controls Boards Emergency."; 
+prog_char reason_TELEMETRY_EMERGENCY[] PROGMEM = "Telemetry Board Emergency."; 
+prog_char reason_OTHER1_EMERGENCY[]    PROGMEM = "Other Board 1 Emergency."; 
+prog_char reason_OTHER2_EMERGENCY[]    PROGMEM = "Other Board 2 Emergency."; 
+prog_char reason_OTHER3_EMERGENCY[]    PROGMEM = "Other Board 3 Emergency."; 
+prog_char reason_BPS_ERROR[]           PROGMEM = "Critical Battery Protection System Heartbeat.";
+prog_char reason_BAD_CAN[]             PROGMEM = "Lost CAN Communication.";
+prog_char reason_CODING_ERROR[]        PROGMEM = "Unspecified Shutdown Reason: Coding Error.";
+prog_char reason_UNKNOWN[]             PROGMEM = "Unknown Shutdown Code";
+
+PROGMEM const char *errorCode_lookup[] = 	   // an array containing all of our error codes
+{   
+  reason_POWER_LOSS,
+  reason_KEY_OFF,
+  reason_BPS_HEARTBEAT,
+  reason_S_UNDERVOLT,
+  reason_S_OVERVOLT,
+  reason_S_OVERCURRENT,
+  reason_BPS_EMERGENCY_OTHER,
+  reason_BPS_UNDERVOLT, 
+  reason_BPS_OVERVOLT,
+  reason_BPS_OVERTEMP,
+  reason_IO_EMERGENCY,
+  reason_CONTROLS_EMERGENCY,
+  reason_TELEMETRY_EMERGENCY,
+  reason_OTHER1_EMERGENCY,
+  reason_OTHER2_EMERGENCY,
+  reason_OTHER3_EMERGENCY,
+  reason_BPS_ERROR,
+  reason_BAD_CAN,
+  reason_CODING_ERROR,
+  reason_UNKNOWN
+};
+
+char numErrorCodes=20; //number of valid shutdown types
+
+
+/* Prints out the shutdown Reason */
+/* strings containing error messages are contained in program memory to save SRAM space */
 void printShutdownReason(int shutdownReason){
-  Serial.print("Shutdown Reason: ");
-  switch (shutdownReason){
-    case POWER_LOSS:
-      //Serial.println("Loss of power to cutoff.  Possibly due to bomb switch.");
-      break; 
-    case KEY_OFF:
-      //Serial.println("Normal Shutdown.  Key in off position.");
-      break; 
-    case BPS_HEARTBEAT:
-      //Serial.println("Missing BPS heartbeat.");
-      break; 
-    case S_UNDERVOLT:
-      //Serial.println("High voltage line undervoltage.");
-      break; 
-    case S_OVERVOLT:
-      //Serial.println("High voltage line overvoltage.");
-      break; 
-    case S_OVERCURRENT:
-      //Serial.println("High voltage line overcurrent.");
-      break; 
-    case BPS_EMERGENCY_OTHER:
-      //Serial.println("Battery Protection System Emergency: Other");
-      break; 
-    case BPS_UNDERVOLT:
-      //Serial.println("BPS Emergency: Battery Undervoltage");
-      break; 
-    case BPS_OVERVOLT:
-      //Serial.println("BPS Emergency: Battery Overvoltage");
-      break; 
-    case BPS_OVERTEMP:
-      //Serial.println("BPS Emergency: Batteries Overtemperature");
-      break; 
-    case IO_EMERGENCY:
-      //Serial.println("Input Output Boards Emergency.");
-      break;   
-    case CONTROLS_EMERGENCY:
-      //Serial.println("Controls Boards Emergency.");
-      break;
-    case TELEMETRY_EMERGENCY:
-      //Serial.println("Telemetry Board Emergency.");
-      break;
-    case OTHER1_EMERGENCY:
-      //Serial.println("Other Board 1 Emergency.");
-      break;
-    case OTHER2_EMERGENCY:
-      //Serial.println("Other Board 2 Emergency.");
-      break;
-    case OTHER3_EMERGENCY:
-      //Serial.println("Other Board 3 Emergency.");
-      break;
-    case BPS_ERROR:
-      //Serial.println("Battery Protection System Error.");
-      break; //redundant?
-    case BAD_CAN:
-      //Serial.println("Lost CAN Communication");
-      break;
-    default:
-      //Serial.println("Unknown Shutdown Reason.");
-      break;
-  }  
+  char buffer[55]; //create a buffer to hold our error string  
+  if (shutdownReason>=numErrorCodes){
+    shutdownReason =numErrorCodes; //if we have an invalid shutdownReason, set the reason to unknown
+  }
+  strcpy_P(buffer, (char*)pgm_read_word(&(errorCode_lookup[shutdownReason])));  //copy the error code from program memory into our buffer c string.
+  Serial.print("Shutdown Reason: ");  
+  Serial.println( buffer ); //print out the error message
 }
 
 
@@ -240,9 +241,9 @@ void playSongs(){
           currentNote++;
           if (currentNote >= songSize) {
             playingSong = false;
-            digitalWrite(BUZZER, LOW);
+            digitalWrite(BUZZER, LOW);            
+            songTempo=1;
           }
-          songTempo=1;
         }
 }
 
@@ -361,17 +362,19 @@ void floatEncoder(CanMessage &msg,float f1, float f2) {
 
 void sendVoltages(){
   CanMessage msg = CanMessage();
-  long v1 = readV1();
-  long v2 = readV2();
-  
-  float volt1 = v1;
-  float volt2 = v2;
+  long v1 = readV1(); //get Voltage 1 (in mV)
+  long v2 = readV2(); //get Voltage 2 (in mV)
+  float mvolt1 = v1; //convert to float (still in mV)
+  float mvolt2 = v2; //convert to float (still in mV)
+  float volt1=mvolt1/1000; //convert to Volts from mV
+  float volt2=mvolt2/1000; //convert to Volts from mV
   
   #ifdef DEBUG_MEASUREMENTS
       Serial.print(" V1: ");
-      Serial.print(v1);
+      Serial.print(volt1);
       Serial.print("mV V2: ");
-      Serial.print(v2);     
+      Serial.print(volt2);   
+      Serial.println("mV ");  
   #endif
   
   msg.id = CAN_CUTOFF_VOLT;
@@ -396,16 +399,18 @@ void sendCurrents(){
   long c1 = readC1();
   long c2 = readC2();
   
-  float curr1 = c1;
-  float curr2 = c2;
+  float mcurr1 = c1; //convert to float (mA)
+  float mcurr2 = c2; //convert to float (mA)
+  float curr1 = mcurr1/1000; //convert to A from mA
+  float curr2 = mcurr2/1000; //convert to A from mA
   
   #ifdef DEBUG_MEASUREMENTS
-      Serial.print("mV C1: ");
-      Serial.print(C1);
+      Serial.print("C1: ");
+      Serial.print(curr1);
       Serial.print(" C2: ");
-      Serial.println(C2); 
-      //Serial.print(" RxE: ");
-      //Serial.println(Can.rxError());
+      Serial.println(curr2); 
+      Serial.print(" RxE: ");
+      Serial.println(Can.rxError());
   #endif
   
   msg.id = CAN_CUTOFF_CURR;
@@ -424,12 +429,12 @@ void sendCurrents(){
   Can.send(msg);
 }
 
-
 /* Send system voltage/current over CAN */
 void sendReadings() {
   sendVoltages();
   sendCurrents();  
 }
+
 
 void sendHeartbeat() {
   CanMessage msg;
