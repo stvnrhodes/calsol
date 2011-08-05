@@ -372,9 +372,9 @@ void sendVoltages(){
   #ifdef DEBUG_MEASUREMENTS
       Serial.print(" V1: ");
       Serial.print(volt1);
-      Serial.print("mV V2: ");
+      Serial.print("V V2: ");
       Serial.print(volt2);   
-      Serial.println("mV ");  
+      Serial.print("V ");  
   #endif
   
   msg.id = CAN_CUTOFF_VOLT;
@@ -408,7 +408,7 @@ void sendCurrents(){
       Serial.print("C1: ");
       Serial.print(curr1);
       Serial.print(" C2: ");
-      Serial.println(curr2); 
+      Serial.print(curr2); 
       Serial.print(" RxE: ");
       Serial.println(Can.rxError());
   #endif
@@ -552,12 +552,14 @@ void do_normal() {
     //msg.len = 1;
     //msg.data[0] = 0x08;
     //Can.send(msg);
+    return;
   } else if ( checkOffSwitch() ) { //check for off switch
     #ifdef DEBUG
       Serial.println("Switch off. Normal -> Turnoff");
     #endif
     /* Check if switch is on "On" position */
     state = TURNOFF;
+    return;
   } else if ( timeLastHeartbeat > 1000) { //check for missing bps heartbeats
     /* Did not receive heartbeat from BPS for 1 second */
     msg.id = CAN_EMER_CUTOFF;
@@ -579,12 +581,13 @@ void do_normal() {
   } else if (warning){ //check for level 1 warning
       raiseWarning(warning);
   }
-  
+  playSongs();
 }
 
 void lastShutdownReason(){
   int memoryIndex = EEPROM.read(0);  
   int lastReason = EEPROM.read(memoryIndex);
+  Serial.print("Last ");
   printShutdownReason(lastReason);
   
 }
