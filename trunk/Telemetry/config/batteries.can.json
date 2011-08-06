@@ -319,5 +319,12 @@
     "messages" : [
       ["Chip temp", "celcius", "Internal temperature probe"]
     ]
+  },
+  "0x41" : {
+    "name": "BPS Heartbeat",
+    "format": "B",
+    "messages": [
+      ["Heartbeat status", "bits", "stuff"]
+    ]
   }
 }  

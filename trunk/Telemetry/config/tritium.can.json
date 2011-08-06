@@ -37,7 +37,9 @@
     "name" : "Status Information",
     "format" : "HHH2x",
     "messages" : [
-      ["Limit Flags", "bits", "Blah"]
+      ["Limit Flags", "bits", "Flags indicating the control loop being used to limit current"],
+      ["Error Flags", "bits", "Flags indicating errors. 2^0: HW OC, 2^1: SW OC, 2^2: DC Bus OC, 2^3: Hall Error, 2^4: Watchdog, 2^5: Config, 2^6 15V Rail UV"],
+      ["Active Configuration", "index", "Index of the active motor configuration being used"]
     ]
   },
   "0x402" : {
