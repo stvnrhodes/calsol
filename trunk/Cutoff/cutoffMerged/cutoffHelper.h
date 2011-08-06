@@ -110,12 +110,12 @@ PROGMEM const char *errorCode_lookup[] = 	   // an array containing all of our e
   reason_UNKNOWN
 };
 
-char numErrorCodes=20; //number of valid shutdown types
+unsigned int numErrorCodes=20; //number of valid shutdown types
 
 
 /* Prints out the shutdown Reason */
 /* strings containing error messages are contained in program memory to save SRAM space */
-void printShutdownReason(int shutdownReason){
+void printShutdownReason(unsigned int shutdownReason){
   char buffer[55]; //create a buffer to hold our error string  
   if (shutdownReason>=numErrorCodes){
     shutdownReason =numErrorCodes; //if we have an invalid shutdownReason, set the reason to unknown
@@ -234,7 +234,7 @@ void playSongs(){
         }
         else if (playingSong && endOfNote < millis()) {
         //play some tunes
-          int noteDuration = songTempo*1000/duration[currentNote]; 
+          int noteDuration = 1000/(duration[currentNote] *songTempo); 
           tone(BUZZER, notes[currentNote], noteDuration);
           int pause = noteDuration * 1.30 ;
           endOfNote = millis() + pause;
@@ -475,6 +475,7 @@ void do_precharge() {
   int prechargeTarget = 90; //~100V ?
   int voltageDiff= abs(prechargeV-batteryV);
   
+  lastState= PRECHARGE;
   if ( checkOffSwitch() ) {
     /* Off switch engaged, Transition to off */
     state = TURNOFF; //actually redundant
@@ -508,12 +509,20 @@ void do_precharge() {
     digitalWrite(LVRELAY, HIGH);
     
     // Hack to wait until the BPS turns on
+   unsigned int waiting= millis();
    while(!last_heart_bps) {
+     if(millis()-waiting>10000){ //10 second timeout
+       shutdownReason=BPS_HEARTBEAT;
+       state=ERROR;
+       return;       
+     }
+     else{
       #ifdef DEBUG_CAN
         Serial.print("Last can: ");
         Serial.println(last_can);
       #endif
-      delay(10);    
+      delay(10); 
+     }
    }
     
     /* Sound buzzer */
@@ -530,7 +539,6 @@ void do_precharge() {
     digitalWrite(BUZZER, LOW);
     
     /* State Transition */
-    lastState= PRECHARGE;
     state = NORMAL;
   }
 }
@@ -552,14 +560,14 @@ void do_normal() {
     //msg.len = 1;
     //msg.data[0] = 0x08;
     //Can.send(msg);
-    return;
+	return;
   } else if ( checkOffSwitch() ) { //check for off switch
     #ifdef DEBUG
       Serial.println("Switch off. Normal -> Turnoff");
     #endif
     /* Check if switch is on "On" position */
     state = TURNOFF;
-    return;
+	return;
   } else if ( timeLastHeartbeat > 1000) { //check for missing bps heartbeats
     /* Did not receive heartbeat from BPS for 1 second */
     msg.id = CAN_EMER_CUTOFF;
@@ -585,22 +593,25 @@ void do_normal() {
 }
 
 void lastShutdownReason(){
-  int memoryIndex = EEPROM.read(0);  
-  int lastReason = EEPROM.read(memoryIndex);
+  unsigned int memoryIndex = EEPROM.read(0);
+  if (memoryIndex > 50){//in case EEPROM data is bad
+    memoryIndex=1;
+  }
   Serial.print("Last ");
+  unsigned int lastReason = EEPROM.read(memoryIndex);
   printShutdownReason(lastReason);
   
 }
 
 void shutdownLog(){
-  int memoryIndex = EEPROM.read(0);  
-  for(int i=1;i<50; i++){ 
-    int lastReason = EEPROM.read(memoryIndex);
-    printShutdownReason(lastReason);
-    memoryIndex++;
+  int memoryIndex = EEPROM.read(0);
+  for(int i=1;i<=50; i++){ 
     if (memoryIndex>50){
       memoryIndex=1;
     }
+    unsigned int lastReason = EEPROM.read(memoryIndex);
+    printShutdownReason(lastReason);
+    memoryIndex++;
   }
 }
 
@@ -692,7 +703,7 @@ void do_error() {
 }
 
 void printLastWarning(){
-  int warningID = EEPROM.read(51);
+  unsigned int warningID = EEPROM.read(51);
   switch (warningID){
     case 0x01:
       Serial.println("Undervolt Warning detected");
