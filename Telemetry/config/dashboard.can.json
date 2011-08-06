@@ -1,4 +1,11 @@
 {
+    "0x503" : {
+        "name": "Tritium Reset",
+        "format": "",
+        "messages" : [],
+        "source" : "Input Board",
+        "destination" : "Tritium motor controller"
+    },
 	  "0x481" : {
     "name" : "Dashboard Inputs",
     "format" : "BBBBB",
