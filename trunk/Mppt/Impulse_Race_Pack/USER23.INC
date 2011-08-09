@@ -28,7 +28,7 @@
 ;**********************************************************************
 ;   maximum battery voltage
 ;**********************************************************************
-#define INITDUTY	0x74		; Duty resulting of Ubat and Uoc
+#define INITDUTY	0x74		; Duty resulting of Ubat and Uoc.
 #define MAXUOH		0x02		; 145.17 V: Max Batt. volt HByte 
 					; in 196.97 mV Units
 #define MAXUOL		0xE1		; 145.17 V: Max Batt. volt LByte in
@@ -68,5 +68,5 @@
 ;   Maximum Power Point Input Voltage (influences tracking step width)
 ;**********************************************************************
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
-#define UmppH 0x02      ; Mpp input voltage HByte 86 V in 150.49 mV Units
-#define UmppL 0x3B	    ; Mpp input voltage LByte 86 V in 150.49 mV Units
+#define UmppH 0x01      ; Mpp input voltage HByte 86 V in 150.49 mV Units
+#define UmppL 0x32	    ; Mpp input voltage LByte 86 V in 150.49 mV Units
