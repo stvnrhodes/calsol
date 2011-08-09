@@ -4,8 +4,8 @@
 // pin 38 - MISO 
 // pin 37 - MOSI 
 // pin B0 - Slave Select  
-#define START digitalWrite(B0,LOW); //Begins chip communication 
-#define END digitalWrite(B0,HIGH); //Ends chip communication  
+#define START_BPS_SPI digitalWrite(B0,LOW) //Begins chip communication 
+#define END_BPS_SPI digitalWrite(B0,HIGH)  //Ends chip communication  
 
 //Control Bytes 
 #define WRCFG 0x01 //write config 
@@ -19,107 +19,106 @@
 #define fan1 16
 #define fan2 17
 
-const byte boards[3] = { 0x80 , 0x81 , 0x82 };
+const byte board_address[3] = {0x80, 0x81, 0x82};
 const byte OV = 0xAB; //4.1V
 const byte UV = 0x71; //2.712V
 const float over = 4.1;
 const float under = 2.7;
 const int B = 3988;
 
-byte config[6] = { 0xE5,0x00,0x00,0x00,UV,OV }; //Default config
+byte config[6] = {0xE5, 0x00, 0x00, 0x00, UV, OV}; //Default config
 int heartrate= 200; //send heartbeat every 200ms;
 unsigned long lastHeartbeat =0;
-unsigned long cycleTime =0;
 
 //Write the configuration 
-void writeConfig(byte*config) {
-  START
+void writeConfig(byte* config) {
+  START_BPS_SPI;
   SPI.transfer(WRCFG); //configuration is written to all chips
   for(int i=0;i<6;i++) {
     SPI.transfer(config[i]);
   }
-  END 
+  END_BPS_SPI; 
 }
 
 //Write single configuration to board
-void writeConfig(byte*config,byte board) {
-  START
+void writeConfig(byte* config, byte board) {
+  START_BPS_SPI;
   SPI.transfer(board); //non-broadcast command
   SPI.transfer(WRCFG); //configuration is written to all chips
   for(int i=0;i<6;i++) {
     SPI.transfer(config[i]);
     
   }
-  END 
+  END_BPS_SPI; 
 }
 
 //Read the configuration for a board
-void readConfig(byte*config,byte board) {
-  START   
+void readConfig(byte* config, byte board) {
+  START_BPS_SPI;   
   SPI.transfer(board); //board address is selected
   SPI.transfer(RDCFG); //configuration is read
   for(int i=0;i<6;i++) {
     config[i] = SPI.transfer(RDCFG);
   }
-  END
+  END_BPS_SPI;
 }
 
-//Begins CV A/D conversion
+// Begins CV A/D conversion
 void beginCellVolt() {
-  START
+  START_BPS_SPI;
   SPI.transfer(STCVAD);
   delay(15); //Time for conversions, approx 12ms
-  END
+  END_BPS_SPI;
 }
 
-//Reads cell voltage registers  
-void readCellVolt(float*cv,byte board) {
-  START
-  SPI.transfer(board); //board address is selected
-  SPI.transfer(RDCV); //cell voltages to be read
-  byte cvr[18]; //buffer to store unconverted values
+// Reads cell voltage registers  
+void readCellVolt(float* cell_voltage, byte board) {
+  START_BPS_SPI;
+  SPI.transfer(board); // board address is selected
+  SPI.transfer(RDCV); // cell voltages to be read
+  byte cvr[18]; // buffer to store unconverted values
   for(int i=0;i<18;i++) {
     cvr[i] = SPI.transfer(RDCV);
   }
-  END 
+  END_BPS_SPI; 
 
   //converting cell voltage registers to cell voltages
-  cv[0] = (cvr[0] & 0xFF) | (cvr[1] & 0x0F) << 8;
-  cv[1] = (cvr[1] & 0xF0) >> 4 | (cvr[2] & 0xFF) << 4;
-  cv[2] = (cvr[3] & 0xFF) | (cvr[4] & 0x0F) << 8;
-  cv[3] = (cvr[4] & 0xF0) >> 4 | (cvr[5] & 0xFF) << 4;
-  cv[4] = (cvr[6] & 0xFF) | (cvr[7] & 0x0F) << 8;
-  cv[5] = (cvr[7] & 0xF0) >> 4 | (cvr[8] & 0xFF) << 4;
-  cv[6] = (cvr[9] & 0xFF) | (cvr[10] & 0x0F) << 8;
-  cv[7] = (cvr[10] & 0xF0) >> 4 | (cvr[11] & 0xFF) << 4;
-  cv[8] = (cvr[12] & 0xFF) | (cvr[13] & 0x0F) << 8;
-  cv[9] = (cvr[13] & 0xF0) >> 4 | (cvr[14] & 0xFF) << 4;
-  cv[10] = (cvr[15] & 0xFF) | (cvr[16] & 0x0F) << 8;
-  cv[11] = (cvr[16] & 0xF0) >> 4 | (cvr[17] & 0xFF) << 4;
+  cell_voltage[0] = (cvr[0] & 0xFF) | (cvr[1] & 0x0F) << 8;
+  cell_voltage[1] = (cvr[1] & 0xF0) >> 4 | (cvr[2] & 0xFF) << 4;
+  cell_voltage[2] = (cvr[3] & 0xFF) | (cvr[4] & 0x0F) << 8;
+  cell_voltage[3] = (cvr[4] & 0xF0) >> 4 | (cvr[5] & 0xFF) << 4;
+  cell_voltage[4] = (cvr[6] & 0xFF) | (cvr[7] & 0x0F) << 8;
+  cell_voltage[5] = (cvr[7] & 0xF0) >> 4 | (cvr[8] & 0xFF) << 4;
+  cell_voltage[6] = (cvr[9] & 0xFF) | (cvr[10] & 0x0F) << 8;
+  cell_voltage[7] = (cvr[10] & 0xF0) >> 4 | (cvr[11] & 0xFF) << 4;
+  cell_voltage[8] = (cvr[12] & 0xFF) | (cvr[13] & 0x0F) << 8;
+  cell_voltage[9] = (cvr[13] & 0xF0) >> 4 | (cvr[14] & 0xFF) << 4;
+  cell_voltage[10] = (cvr[15] & 0xFF) | (cvr[16] & 0x0F) << 8;
+  cell_voltage[11] = (cvr[16] & 0xF0) >> 4 | (cvr[17] & 0xFF) << 4;
   
   for(int i=0;i<12;i++) {
-    cv[i] = cv[i]*1.5*0.001;
+    cell_voltage[i] = cell_voltage[i] * 1.5 * 0.001;
   }
 }  
 
 void beginTemp() {
-  START
+  START_BPS_SPI;
   SPI.transfer(STTMPAD);
   delay(15); //Time for conversions
-  END
+  END_BPS_SPI;
 }
 
 //Reads temperatures
 void readTemp(short*temp,byte board) {
-  START
+  START_BPS_SPI;
   SPI.transfer(board); //board address is selected
   SPI.transfer(RDTMP); //temperatures to be read
   byte tempr[5];
   for(int i=0;i<5;i++) {
     tempr[i] = SPI.transfer(RDTMP);
   }
-  END
-    //convert temperature registers to temperatures
+  END_BPS_SPI;
+  //convert temperature registers to temperatures
   temp[0] = (tempr[0] & 0xFF) | (tempr[1] & 0x0F) << 8;
   temp[1] = (tempr[1] & 0xF0) >> 4 | (tempr[2] & 0xFF) << 4;
   temp[2] = (tempr[3] & 0xFF) | (tempr[4] & 0x0F) << 8;
@@ -146,9 +145,6 @@ void sendCAN(int ID,char*data,int size) {
   for(int i=0;i<size;i++) {
     msg.data[i] = data[i];
   }
-  //float f = *((float*)&msg.data[0]);
-  //Serial.println(ID,HEX);
-  //Serial.println(f);
   Can.send(msg);
 }
 
@@ -185,8 +181,6 @@ boolean checkTemperatures(float*temps,float limit) {
 }
 
 void setup() {
-  //delay(2000);
-  //asm volatile ("  jmp 0");
   Can.begin(1000);
   Serial.begin(115200);
   char init[1] = { 0x00 };
@@ -196,7 +190,7 @@ void setup() {
   pinMode(fan2,OUTPUT);
   digitalWrite(fan1,HIGH);
   digitalWrite(fan2,HIGH);
-  END //Sets Slave Select to high (unselected)
+  END_BPS_SPI; //Sets Slave Select to high (unselected)
   SPI.begin();
   SPI.setClockDivider(SPI_CLOCK_DIV64);
   SPI.setDataMode(SPI_MODE3);
@@ -213,92 +207,68 @@ void loop() {
   boolean warning_temp = false;
   boolean error = false;
   
-  //Active Configuration
-  for(int k=0;k<3;k++) {
-    int length = 12;
-    if(k==2) {
-      length = length--;
+  // Iterate through BPS module boards.
+  for(int k=0; k<3; k++) {
+    // If we're on board 0 or 1, then check 12 cells
+    // If we're on board 2, then theres just 11 cells
+    int length;
+    if(k == 2) {
+      length = 11;
+    } else {
+      length = 12
     }
-    //Communications check
-    /*
-    Serial.print("Board Address: ");
-    Serial.print("0x");
-    Serial.println(boards[k],HEX);
-    */
+    
+    // Ping the boards to make sure the config match
     byte rconfig[6];
-    readConfig(rconfig,boards[k]);
+    readConfig(rconfig, board_address[k]);
     if(rconfig[0]==0xFF || rconfig[0]==0x00 || rconfig[0]==0x02) {
       Serial.print("Board not communicating: ");
       Serial.println(k);
       error = true;
       continue;
     }
-    /*
-    Serial.println("Configuration Registers: ");
-    for(int i=0;i<6;i++) {
-      Serial.print("|");
-      Serial.print(rconfig[i] & 0xFF,HEX);
-    }
-    Serial.println("|");
-    Serial.println("------------------------------------------");
-    */
-    
 
-    //Reading cell voltages
+    // Measures voltages
+    float cell_voltages[12];
+    // Send "Start ADC" command to BPS module.  Includes a 15 ms delay.
     beginCellVolt();
-    float cv[12];
-    readCellVolt(cv,boards[k]);
+    // Stores ADC readings from board k into the cell_voltages array
+    readCellVolt(cell_voltages, board_address[k]);
     
-    
-    Serial.println("Cell Voltages: ");
-    for(int i=0;i<length;i++) {
-      Serial.print(i+1);
-      Serial.print(": ");
-      Serial.println(cv[i]);
-    }
-    Serial.println("------------------------------------------");
-    
-
-    //Reading temperatures
+    // Read Temperatures
+    short raw_temperature_readings[3];
+    float converted_temperature_readings[3];
+    // Send "Start Temperature" command to BPS module.  Includes a 15 ms delay.
     beginTemp();
-    short temp[3];
-    float convTemp[3];
-    readTemp(temp,boards[k]);
-    convertVoltTemp(temp,convTemp);
-   
-    /*
-    Serial.println("Temperature: ");
-    Serial.print("External 1: ");
-    Serial.println(convTemp[0]);
-    Serial.print("External 2: ");
-    Serial.println(convTemp[1]);
-    Serial.print("Internal: ");
-    Serial.println(convTemp[2]);
-    Serial.println("------------------------------------------");
-    */
+    // Queries the BPS module for temperature readings.  Stores the readings
+    // in raw_temperature_readings
+    readTemp(raw_temperature_readings, board_address[k]);
+    // Convert temperature readings into kelvin readings.
+    convertVoltTemp(raw_temperature_readings, converted_temperature_readings);
     
-    //Check for absolute voltage problems
-    if(checkOverVoltage(cv,4.0,length)) {
-      discharge=true; //balance cells
-      if(checkOverVoltage(cv,4.05,length)) { 
-        if(checkOverVoltage(cv,over,length)) { //if batteries over 4.1V shut down system
+    // Checks for overvoltage problems, raises flag if necessary.
+    if(checkOverVoltage(cell_voltages, 4.0, length)) {
+      discharge = true; //balance cells
+      if(checkOverVoltage(cell_voltages, 4.05, length)) { 
+        if(checkOverVoltage(cell_voltages, over, length)) {
+          //if batteries over 4.1V shut down system
           char overchg[1] = { 0x01 };
-          sendCAN(0x021,overchg,1);
+          sendCAN(0x021, overchg, 1);
           error = true;
           delay(10);
           Serial.println("Overvoltage cells");
           delay(30000);
-        } else { //if batteries over 4.05V create warning.
+        } else {
+          //if batteries over 4.05V create warning.
           warning_ov = true;          
         }
       }
     }
-    if(checkUnderVoltage(cv,2.8,length)) {
-        Serial.println("Warning: Undervoltage cells");
-        Serial.print("Pack: ");
-        Serial.println(k);
-      
-      if(checkUnderVoltage(cv,under,length)) {  //if batteries under 2.7V raise warning
+    
+    // Checks for undervoltage problems, raises flag if necessary
+    if(checkUnderVoltage(cell_voltages,2.8,length)) {
+      if(checkUnderVoltage(cell_voltages,under,length)) {
+        // if batteries under 2.7V raise warning
         char underchg[1] = { 0x02 };
         sendCAN(0x021,underchg,1);
         error = true;
@@ -307,63 +277,52 @@ void loop() {
         Serial.print("Pack: ");
         Serial.println(k);
         delay(30000);
-      } else { //if batteries under 2.8V raise warning
-          warning_uv = true;
+      } else {
+        //if batteries under 2.8V raise warning
+        warning_uv = true;
       }
     }
     
-      //Check for absolute temperature problems
-      if(checkTemperatures(convTemp,50)) {
-        if(checkTemperatures(convTemp,55 )) {
-          char exceedtmp[1] = { 0x04 };
-          sendCAN(0x021,exceedtmp,1);
-          error = true;
-          delay(10);
-          Serial.println("Exceeded Temperature Limit");
-          delay(30000);
-        } else {
-          warning_temp = true;
-        }
+    // Check for absolute temperature problems
+    if(checkTemperatures(converted_temperature_readings,50)) {
+      if(checkTemperatures(converted_temperature_readings,55 )) {
+        char exceedtmp[1] = { 0x04 };
+        sendCAN(0x021,exceedtmp,1);
+        error = true;
+        delay(10);
+        Serial.println("Exceeded Temperature Limit");
+        delay(30000);
+      } else {
+        warning_temp = true;
       }
-    
-    //Serial.println("==========================================");
-    
-    /*
-    //Setting fans based upon temperature
-    if(checkTemperatures(convTemp,38)) {
-      digitalWrite(fan2,HIGH);
-    } else {
-      digitalWrite(fan2,LOW);
     }
-    */
 
     //Sending out CAN packets
-    for(int i=0;i<(length+3);i++) {
+    for(int i=0; i<(length+3); i++) {
       char data[4];
       int ID = (1 << 8) | (k << 4) | i;
       if(i < length) {
         if(k==2 && i > 8 && i < 12) {
           continue;
         } else {
-          data[0] = *((char*)&cv[i]);
-          data[1] = *((char*)&cv[i]+1);
-          data[2] = *((char*)&cv[i]+2);
-          data[3] = *((char*)&cv[i]+3);
+          data[0] = *((char*)&cell_voltages[i]);
+          data[1] = *((char*)&cell_voltages[i]+1);
+          data[2] = *((char*)&cell_voltages[i]+2);
+          data[3] = *((char*)&cell_voltages[i]+3);
         }
       } else {
-          data[0] = *((char*)&convTemp[i-length]);
-          data[1] = *((char*)&convTemp[i-length]+1);
-          data[2] = *((char*)&convTemp[i-length]+2);
-          data[3] = *((char*)&convTemp[i-length]+3);
+          data[0] = *((char*)&converted_temperature_readings[i-length]);
+          data[1] = *((char*)&converted_temperature_readings[i-length]+1);
+          data[2] = *((char*)&converted_temperature_readings[i-length]+2);
+          data[3] = *((char*)&converted_temperature_readings[i-length]+3);
       }
       sendCAN(ID,data,4);
     }
-    //Serial.println("Sent CAN packets");
     
-    //Basic discharge, will discharge cells if voltage > 4.0V
+    // Basic discharge, will discharge cells if voltage > 4.0V
     if(discharge) {
       for(int i=0;i<12;i++) {
-        if(cv[i] > 4.0) {
+        if(cell_voltages[i] > 4.0) {
           if(i < 8) {
             config[1] = config[1] | (1 << i); //Sets DCC bits 0-7
           } else {
@@ -371,13 +330,11 @@ void loop() {
           }
         }
       }
-      delay(10);
-      Serial.println("Discharge occuring");
     }
   }
   
-  if ((millis()-lastHeartbeat)>heartrate){
-    //Heartbeat, tells board in case of warning or error.
+  if ((millis() - lastHeartbeat) > heartrate) {
+    // Heartbeat, tells board in case of warning or error.
     if(error) {
       char err[1] = { 0x04 };
       sendCAN(0x041,err,1);
@@ -401,26 +358,21 @@ void loop() {
       delay(10);
       Serial.println("Temperature Warning detected");
       warning_temp=0; //reset warning
-    }
-    else {
+    } else {
       char ok[1] = { 0x00 };
       sendCAN(0x041,ok,1);
       delay(10);
       Serial.print("BPS operations OK ");
       Serial.println(millis());
     }
-    lastHeartbeat=millis();
+    lastHeartbeat = millis();
   }
   
-  //Standby Configuration
+  // Standby Configuration
   if(!discharge) {
     config[0] = 0xE0;
-    config[1] = 0x00; //Reset discharge bits
-    config[2] = 0x00; //Reset discharge bits
-    writeConfig(config); //Writes the standby config (low current)
+    config[1] = 0x00;     // Reset discharge bits
+    config[2] = 0x00;     // Reset discharge bits
+    writeConfig(config);  // Writes the standby config (low current)
   }
-  //delay(500); //sends at best 2 times a second   //I think we should avoid using delay whenever possible.  There are other ways around this, like interupts and checking timers.
-  unsigned long newCycleTime=millis();
-  //Serial.println(newCycleTime-cycleTime);  //print out the amount of time each cycle is takin
-  cycleTime=newCycleTime;
 }
