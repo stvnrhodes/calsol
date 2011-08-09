@@ -375,7 +375,7 @@ class TransparentStream:
         pass
 
     def read(self):
-        self.buffer += self.stream_decoder.decode(self.port.read(4096))
+        self.buffer += self.port.read(4096)
     def process(self):
         self.read()
         if self.buffer.count(self.START_CHAR) < 2:
@@ -383,25 +383,61 @@ class TransparentStream:
 
         packets = []
 
-        self.buffer = self.buffer[self.buffer.index(self.START_CHAR)+1:]
-        index = self.buffer.index(self.START_CHAR)
-        while self.START_CHAR in self.buffer:
-            packets.append(self.buffer[:index])
-            self.buffer = self.buffer[index+1:]
+        #Trim off any incomplete ends of packets at the start of the buffer
+        #The buffer should now look like ShelloSgoSbearsShel
+        #hello, go, and bears will be parsed now and the buffer should
+        #end up as Shel
+        self.buffer = self.buffer[self.buffer.index(self.START_CHAR)]
+        while trimmed.count(START_CHAR) >= 2:
+            #Everything inbetween the first start char (always at index 0)
+            #and the next start char is a packet.
+            index = buf.index(START_CHAR, 1)
+            packets.append(self.buffer[1:index])
+
+            #Reset the buffer so that the first byte is the start char
+            self.buffer = self.buffer[index:]
+
+        tritium_error_map = {
+            2**0: "Hardware Overcurrent Error",
+            2**1: "Software Overcurrent Error",
+            2**2: "DC Bus Overcurrent Error",
+            2**3: "Bad motor position hall sequence",
+            2**4: "Watchdog caused last reset",
+            2**5: "Config read error",
+            2**6: "15V Rail undervoltage error"
+        }
 
         for packet in packets:
             try:
-                ts, id_, descr, data = self.decoder.decode(packet)
+                self.stream_decoder.reset()
+                unescaped = self.stream_decoder.decode(packet)
+                ts, id_, descr, data = self.decoder.decode(unescaped)
             except ValueError as e:
+                #pass
                 print "Error while decoding packet '%s': %s" % (''.join([hex(ord(c)) for c in packet]), e)
             except BaseException as e:
+                #pass
                 print "Unexpected error occured while decoding packet '%s': %s" % (''.join([hex(ord(c)) for c in packet]), e)
-            else:                
+            else:
+                if id_ == 0x503:
+                    self.logger.info("%s: Saw tritium reset message", ts.strftime("%H:%M:%S"))
+                elif id_ == 0x401:
+                    if data[1] != 0:
+                        self.logger.error("%s: Saw tritium error message", ts.strftime("%H:%M:%S"))
+                        for mask in sorted(tritium_error_map.keys()):
+                            if data[1] & mask:
+                                self.logger.info(tritium_error_map[mask])
+                        self.logger.info("%d", data[1])
+                if not descr["messages"]:
+                    self.logger.info("%s:%s Saw %#x:%s", ts.strftime("%H:%M:%S"),ts.microsecond/1000, id_, descr["name"])
+                print_bps = 1#random.randint(1,100) == 1
                 for msg_descr, datum in zip(descr["messages"], data):
-                    ident = "%#x:%s" % (id_, msg_descr[0])
+                    ident = "%#x:%s" % (id_, msg_descr[0])                    
                     self.put_data(ident, (ts, datum), msg_descr)
                     self.msg_queue.put((id_, msg_descr[0], ts, datum))
-                    self.logger.info("%s: Got packet %s = %s", ts.strftime("%H:%M:%S"), ident, datum)
+                    if id_ != 0x481 and ((id_ < 0x100 or id_ > 0x1ff) or print_bps):
+                        #pass
+                        self.logger.info("%s: Got packet %s = %s", ts.strftime("%H:%M:%S"), ident, datum)
 
     def put_data(self, identifier, datum, desc=None):
         if identifier not in self.data_table:
