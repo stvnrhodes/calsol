@@ -387,11 +387,11 @@ class TransparentStream:
         #The buffer should now look like ShelloSgoSbearsShel
         #hello, go, and bears will be parsed now and the buffer should
         #end up as Shel
-        self.buffer = self.buffer[self.buffer.index(self.START_CHAR)]
-        while trimmed.count(START_CHAR) >= 2:
+        self.buffer = self.buffer[self.buffer.index(self.START_CHAR):]
+        while self.buffer.count(self.START_CHAR) >= 2:
             #Everything inbetween the first start char (always at index 0)
             #and the next start char is a packet.
-            index = buf.index(START_CHAR, 1)
+            index = self.buffer.index(self.START_CHAR, 1)
             packets.append(self.buffer[1:index])
 
             #Reset the buffer so that the first byte is the start char
