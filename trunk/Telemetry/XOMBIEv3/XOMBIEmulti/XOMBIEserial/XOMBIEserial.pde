@@ -23,7 +23,7 @@ void setup() {
     digitalWrite(DEBUG_LED1, LOW);
     digitalWrite(DEBUG_LED2, LOW);
 
-    Serial1.begin(57600);
+    Serial1.begin(115200);
     Serial.begin(115200);
     //Serial.println("Starting serial");
     Can.begin(1000);
@@ -95,45 +95,17 @@ uint32_t createEscapedMessage(char* dst, char* src, uint32_t len) {
     return dst - start;
 }
 
-typedef struct {
-  uint16_t id;
-  uint8_t len;
-  uint8_t data[16];
-} fakeCanMsg;
-
-fakeCanMsg m1 = (fakeCanMsg) {0x100, 4, "foob"};
-
 uint8_t messageAvailable() {
-  // debug:
-#ifdef DEBUG
-  return 1;
-#endif
-  // Actual:
-#ifndef DEBUG
   return CanBufferSize() > 0;
-#endif
 }
 
 void loop() {
     char msg[32], buf[64], *ptr = buf;
     if (messageAvailable()) {
-        // Debug test 1:
-//        uint16_t can_id = 0;
-//        uint8_t* data = (uint8_t*) "Jimmy's moment.";
-//        uint8_t data_len = 15;
-        // Debug test 2:
-#ifdef DEBUG
-        uint16_t can_id = m1.id;
-        uint8_t* data = m1.data;
-        uint8_t data_len = m1.len;
-#endif
-        // Actual test -- don't forget to change messageAvailable!
-#ifndef DEBUG
         CanMessage can_msg = CanBufferRead();
         uint16_t can_id = can_msg.id;
         uint8_t* data = (uint8_t*) can_msg.data;
         uint8_t data_len = can_msg.len;
-#endif
         initMsg(msg, can_id, data_len, data);
         uint32_t buf_len = createEscapedMessage(buf, msg, data_len + 2);
         for (int i = 0; i < buf_len; i++) {
