@@ -122,7 +122,7 @@
    "period" : 1000,
    "description" : ""
   },
-  "0x410" : {
+  "0x40A" : {
    "name" : "Fan Speed Measurement",
    "format" : "ff",
    "messages" : [
@@ -132,7 +132,7 @@
    "period" : 1000,
    "description" : ""
   },
-  "0x411" : {
+  "0x40B" : {
    "name" : "Sink & Motor Temperature Measurement",
    "format" : "ff",
    "messages" : [
@@ -142,7 +142,7 @@
    "period" : 1000,
    "description" : ""
   },
-  "0x412" : {
+  "0x40C" : {
    "name" : "Air In & CPU Temperature Measurement",
    "format" : "ff",
    "messages" : [
@@ -152,7 +152,7 @@
    "period" : 5000,
    "description" : ""
   },
-  "0x413" : {
+  "0x40D" : {
    "name" : "Air Out & Cap Temperature Measurement",
    "format" : "ff",
    "messages" : [
@@ -162,7 +162,7 @@
    "period" : 5000,
    "description" : ""
   },
-  "0x414" : {
+  "0x40E" : {
    "name" : "Odometer & Bus AmpHours Measurement",
    "format" : "ff",
    "messages" : [
