@@ -34,9 +34,8 @@ void setup() {
 
     Serial1.begin(115200);
     Serial.begin(115200);
-    //Serial.println("Starting serial");
-    //Can.begin(1000);
-    //CanBufferInit();
+    Can.begin(1000);
+    CanBufferInit();
     Can1.begin(125);
     Serial.println("Starting up");
 }
@@ -121,18 +120,12 @@ inline void transmitMessage(uint16_t id, uint8_t* data, uint8_t len) {
 }
 
 void loop() {
-    /*
+    
     if (messageAvailable()) {
         CanMessage can_msg = CanBufferRead();
         transmitMessage(can_msg.id, (uint8_t*)(can_msg.data), can_msg.len);
     }
-    */
-    /*
-    if (Can1.available()) {
-        CanMessage can_msg = Can1.recv(Can1.available(), can_msg);
-        Serial.println(can_msg.id);
-        //transmitMessage(can_msg.id, (uint8_t*)(can_msg.data), can_msg.len);
-    }*/
+    
     //Sends a CAN request to the MPPTs
     //1110001 (0x710) for Master Request Base ID
     //mppt_index ranges from 1 to 5 corresponding to the MPPT index
@@ -149,11 +142,13 @@ void loop() {
             mppt_index = 1;
     }
     //Parsing MPPT CAN packet
-    if (Can1.available()) {
+    PCICR &=~ 0x02;  // Disable PC1 Interrupt
+    char avail = Can1.available();
+    PCICR |= 0x02;   // Re-enable PC1 interrupt
+    if (avail) {
         CanMessage msg;
-        Can1.recv(Can1.available(), msg);
-        Serial.print("Saw packet from MPPT w/id ");
-        Serial.println(msg.id, HEX);
+        //Serial.print("Saw packet from MPPT w/id ");
+        //Serial.println(msg.id, HEX);
         if ((msg.id & 0x770) == 0x770) { 
             struct mppt_msg data;
             data.flags = msg.data[0] & 0xf0;
@@ -161,10 +156,10 @@ void loop() {
             data.Iin  = ((msg.data[2] & 0x03) << 8) | msg.data[3];
             data.Vout = ((msg.data[4] & 0x03) << 8) | msg.data[5];
             data.Tamb = msg.data[6];
-            Serial.println(data.Vin);
-            Serial.println(data.Iin);
-            Serial.println(data.Vout);
-            Serial.println(data.Tamb, HEX);
+            //Serial.println(data.Vin);
+            //Serial.println(data.Iin);
+            //Serial.println(data.Vout);
+            //Serial.println(data.Tamb, HEX);
             transmitMessage(msg.id, (uint8_t*)(&data), 8);
         }
     }
