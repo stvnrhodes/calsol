@@ -55,8 +55,8 @@ class DataDumperApplication(QtGui.QApplication):
         link(self.main_window.export_button.pressed, trigger_dump)
 
     def dump_data(self, db_name, tz, start, end, out_name, packet_id, use_timestamp=False, trim=True, delete_outliers=True):
-        start = tz.localize(start).astimezone(pytz.utc)
-        end = tz.localize(end).astimezone(pytz.utc)
+        start = pytz.utc.localize(start)
+        end = pytz.utc.localize(end)
             
         if not db_name:
             self.show_error("Please enter the path to the database file (.db)")
@@ -129,14 +129,16 @@ class DataDumperApplication(QtGui.QApplication):
             if use_timestamp:
                 time_header = "time"
             else:
-                time_header = "time (seconds since %s)" % start
+                time_header = "time (seconds since %s)" % start.astimezone(tz)
             out.write(",".join([time_header] + key_order) + "\n")
             for time, values in sorted(time_map.items()):
                 if time in skip:
                     continue
                 dt = pytz.utc.localize(time)
                 if use_timestamp:
-                    out.write(dt.strftime("%Y-%m-%d %H:%M:%S"))
+                    #out.write(dt.astimezone(tz).strftime("%b %d, %Y %I:%M:%S %p"))
+                    #out.write(dt.astimezone(tz).strftime("%m/%d/%y %I:%M:%S %p"))
+                    out.write(dt.astimezone(tz).strftime("%Y-%m-%d %H:%M:%S.%f"))
                 else:
                     td = dt - start
                     out.write("%.6f" % (86400 * td.days + td.seconds + 1e-6*td.microseconds))
