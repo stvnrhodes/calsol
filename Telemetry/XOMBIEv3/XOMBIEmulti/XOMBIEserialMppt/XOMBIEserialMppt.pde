@@ -1,6 +1,15 @@
 #include "constants.h"
 //#define DEBUG
 
+HardwareCan Can1 = HardwareCan(2, 1);
+struct mppt_msg {
+    uint8_t flags; //Battery Voltage Level Reached Flag, Overtemperature Flag, No Charge Flag, Undervoltage Flag
+    uint16_t Vin;  //Input (Array) Voltage
+    uint16_t Iin;  //Input (Array) Current
+    uint16_t Vout; //Output (Battery) Voltage
+    uint8_t Tamb;  //Ambient Temp. in Celsius (steps of 5 degrees Celsius)
+};
+
 void setup() {
     pinMode(DTR_PIN, OUTPUT);
     pinMode(RTS_PIN, OUTPUT);
@@ -23,12 +32,12 @@ void setup() {
     digitalWrite(DEBUG_LED1, LOW);
     digitalWrite(DEBUG_LED2, LOW);
 
-    Serial1.begin(57600);
+    Serial1.begin(115200);
     Serial.begin(115200);
     //Serial.println("Starting serial");
-    Can.begin(1000);
-    CanBufferInit();
-	Can1 = HardwareCan(2, 1);
+    //Can.begin(1000);
+    //CanBufferInit();
+    Can1.begin(125);
     Serial.println("Starting up");
 }
 const uint8_t START_CHAR = 0xE7;
@@ -87,91 +96,77 @@ void initMsg(char* msg, uint16_t id, uint8_t len, uint8_t* data) {
  * Creates in dst the message contained in src with proper start symbol
  * and escape sequences. Return the len of the new message.
  */
-uint32_t createEscapedMessage(char* dst, char* src, uint32_t len) {
+uint8_t createEscapedMessage(char* dst, char* src, uint8_t len) {
     char* start = dst;
     *dst++ = START_CHAR;
-    for (uint32_t i = 0; i < len; i++) {
+    for (uint8_t i = 0; i < len; i++) {
         dst = encode(dst, src[i]);
     }
     return dst - start;
 }
 
-typedef struct {
-  uint16_t id;
-  uint8_t len;
-  uint8_t data[16];
-} fakeCanMsg;
-
-fakeCanMsg m1 = (fakeCanMsg) {0x100, 4, "foob"};
-
-uint8_t messageAvailable() {
-  // debug:
-#ifdef DEBUG
-  return 1;
-#endif
-  // Actual:
-#ifndef DEBUG
+inline uint8_t messageAvailable() {
   return CanBufferSize() > 0;
-#endif
+}
+
+inline void transmitMessage(uint16_t id, uint8_t* data, uint8_t len) {
+    char unesc_buffer[16];
+    char esc_buffer[32];
+    initMsg(unesc_buffer, id, len, data);
+    uint8_t esc_len = createEscapedMessage(esc_buffer, unesc_buffer, len+2);
+    for (uint8_t i = 0; i < esc_len; i++) {
+        Serial1.write(esc_buffer[i]);
+        //Serial.write(esc_buffer[i]);
+    }
 }
 
 void loop() {
-    char msg[32], buf[64], *ptr = buf;
+    /*
     if (messageAvailable()) {
-        // Debug test 1:
-//        uint16_t can_id = 0;
-//        uint8_t* data = (uint8_t*) "Jimmy's moment.";
-//        uint8_t data_len = 15;
-        // Debug test 2:
-#ifdef DEBUG
-        uint16_t can_id = m1.id;
-        uint8_t* data = m1.data;
-        uint8_t data_len = m1.len;
-#endif
-        // Actual test -- don't forget to change messageAvailable!
-#ifndef DEBUG
         CanMessage can_msg = CanBufferRead();
-        uint16_t can_id = can_msg.id;
-        uint8_t* data = (uint8_t*) can_msg.data;
-        uint8_t data_len = can_msg.len;
-#endif
-        initMsg(msg, can_id, data_len, data);
-        uint32_t buf_len = createEscapedMessage(buf, msg, data_len + 2);
-        for (int i = 0; i < buf_len; i++) {
-            Serial1.write(buf[i]);
-        }
+        transmitMessage(can_msg.id, (uint8_t*)(can_msg.data), can_msg.len);
     }
+    */
+    /*
+    if (Can1.available()) {
+        CanMessage can_msg = Can1.recv(Can1.available(), can_msg);
+        Serial.println(can_msg.id);
+        //transmitMessage(can_msg.id, (uint8_t*)(can_msg.data), can_msg.len);
+    }*/
     //Sends a CAN request to the MPPTs
     //1110001 (0x710) for Master Request Base ID
     //mppt_index ranges from 1 to 5 corresponding to the MPPT index
+    
     if (millis() - last_mppt_can > 200) {
-        CanMessage msg;
-        msg.id = 0x710 + mppt_index;
-        msg.len = 0;
-        Can.send(msg);
+        last_mppt_can = millis();
+        /*
+        Serial.print("Sending message for ");
+        Serial.println(mppt_index);
+        */
+        Can1.send(CanMessage(0x710 + mppt_index, 0, 0));
         mppt_index++;
         if (mppt_index > 5)
             mppt_index = 1;
     }
     //Parsing MPPT CAN packet
-    if (Can.available()) {
+    if (Can1.available()) {
         CanMessage msg;
-        Can.recv(Can.available(), msg);
-        //Battery Voltage Level Reached Flag
-        char BVLR = msg.data[0] & (1<<7);
-        //Overtemperature Flag
-        char OVT = msg.data[0] & (1<<6);
-        //No Charge Flag
-        char NOC = msg.data[0] & (1<<5);
-        //Undervoltage Flag
-        char UNDV = msg.data[0] & (1<<4);
-        //Input (Array) Voltage
-        int Vin = ((msg.data[0] & 0x3)<<8) | msg.data[1];
-        //Input (Array) Current
-        int Iin = ((msg.data[2] & 0x3)<<8) | msg.data[3];
-        //Output (Battery) Voltage
-        int Vout = ((msg.data[4] & 0x3)<<8) | msg.data[5];
-        //Ambient Temp. in Celsius (steps of 5 degrees Celsius)
-        int Tamb = msg.data[6];
+        Can1.recv(Can1.available(), msg);
+        Serial.print("Saw packet from MPPT w/id ");
+        Serial.println(msg.id, HEX);
+        if ((msg.id & 0x770) == 0x770) { 
+            struct mppt_msg data;
+            data.flags = msg.data[0] & 0xf0;
+            data.Vin  = ((msg.data[0] & 0x03) << 8) | msg.data[1];
+            data.Iin  = ((msg.data[2] & 0x03) << 8) | msg.data[3];
+            data.Vout = ((msg.data[4] & 0x03) << 8) | msg.data[5];
+            data.Tamb = msg.data[6];
+            Serial.println(data.Vin);
+            Serial.println(data.Iin);
+            Serial.println(data.Vout);
+            Serial.println(data.Tamb, HEX);
+            transmitMessage(msg.id, (uint8_t*)(&data), 8);
         }
+    }
+    
 }
