@@ -39,3 +39,6 @@ int packetHistogram = 0xC2;
 int signalTest = 0xE1;
 int dummyPacket = 0xE2;
 unsigned long signalTime = 10000;
+
+unsigned long last_mppt_can = 0;
+int mppt_index = 1;
