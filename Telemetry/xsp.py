@@ -1,4 +1,5 @@
 import codecs
+import datetime
 import json
 import logging
 import struct
@@ -62,6 +63,7 @@ class XSPDemultiplexer:
             return []
         
         packets, self.buffer = self._demux(self.buffer + data)
+        return packets
 
 class XORStreamDecoder(codecs.IncrementalDecoder):
     """
@@ -126,7 +128,7 @@ class XSPStreamDecoder(XORStreamDecoder):
     ESCAPE_CHAR = chr(ESCAPE_BYTE)
     def __init__(self, errors='strict'):
         escaped_bytes = [self.START_CHAR, self.ESCAPE_CHAR]
-        XORStreamDecoder.__init__(self, escaped_bytes, self.ESCAPE_BYTE, errors)
+        XORStreamDecoder.__init__(self, escaped_bytes, self.ESCAPE_CHAR, errors)
         
 class XSPCANParser:
     """
@@ -173,7 +175,7 @@ class XSPCANParser:
             if len_ != expected_len:
                 raise ValueError("Wrong payload size=%d for id=%#x data=%r; expected size %d"
                                  % (len_, id_, packet[2:], expected_len))
-            data = struct.unpack(format_, packet)
+            data = struct.unpack(format_, packet[2:])
         return time, id_, data
 
 class XSPHandler:
@@ -186,8 +188,10 @@ class XSPHandler:
         self.port = None
         self.demuxer = XSPDemultiplexer()
         self.decoder = XSPStreamDecoder()
-        self.parser  = XSPCanParser(lookup_format)
+        self.parser  = XSPCANParser(lookup_format)
         self.lookup_descr = lookup_descr
+
+        self.packet_cache = {}
 
     def bind(self, port):
         if self.port:
@@ -201,10 +205,12 @@ class XSPHandler:
 
     def poll(self, num_bytes):
         if not self.port:
+            logging.warning("Trying to poll with an unbound XSP handler")
             return []
         
         try:
             data = self.port.read(num_bytes)
+
         except ValueError:
             logging.exception("Error reading from serial port")
             raise ConnectionProblem("Error while reading from serial port")
@@ -213,8 +219,9 @@ class XSPHandler:
             xsp_packets = self.demuxer.demux(data)
         except:
             logging.exception("Error while demultiplexing stream")
-            return
-        
+            return []
+
+        messages = []
         for xsp_packet in xsp_packets:
             try:
                 can_packet = self.parser.parse(self.decoder.decode(xsp_packet, final=True))
@@ -227,11 +234,11 @@ class XSPHandler:
 
             time, id_, data = can_packet
             descr = self.lookup_descr(id_)
-
+            
             if not descr['messages']:
-                return [(time, id_, descr['name'], None)]
+                messages.append([(time, id_, descr['name'], None)])
             else:
-                messages = []
-                for msg_name, datum in zip(descr['messages'], datum):
+                for msg_name, datum in zip(descr['messages'], data):
                     messages.append((time, id_, msg_name, datum))
-                return messages
+            
+        return messages

@@ -275,6 +275,10 @@ class TransparentMessageDecoder:
         if LEN < 0 or LEN > 8:
             raise ValueError("Invalid CAN payload length - %d bytes not in [0,8] bytes" % LEN)
 
+        if LEN != len(msg[2:]):
+            raise ValueError("Length from preamble %d mismatches actual length %d in packet w/id %#x" %
+                             (LEN, len(msg[2:]), ID))
+
         TIME = datetime.datetime.utcnow()
         
         if ID in self.descriptors:
