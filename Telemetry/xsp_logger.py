@@ -1,16 +1,11 @@
-from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
-from SocketServer import ThreadingMixIn
-
 import datetime
 import glob
 import json
 import logging
 import os
-from urllib import unquote
-import urlparse
-import re
 import serial
 import sqlite3
+import time
 import traceback
 
 try:
@@ -43,6 +38,8 @@ class XSPLogger(object):
         self.serial_error_count = 0
         self.db_error_count = 0
         self.do_shutdown = False
+        self.last_commit = time.time()
+        self.dirty = False
 
     def lookup_format(self, id_):
         return "<" + str(self.can_descriptors["%#x" % id_].get("format"))
@@ -133,7 +130,9 @@ class XSPLogger(object):
                 logging.critical("Serial port error limit exceeded. Disconnecting.", self.serial_port)
                 self.disconnect_serial()
             return
-        
+
+        if messages:
+            self.dirty = True
         
         for (time, id_, name, datum) in messages:
             try:
@@ -157,7 +156,7 @@ class XSPLogger(object):
                 self.db_connection.execute("INSERT INTO messages (id, name, time, data) VALUES (?,?,?,?)",
                                            [id_, name, time, json.dumps(datum, ensure_ascii=False)])
             except:
-                logging.exception("Exception occurred while inserting CAN message record")                
+                logging.exception("Exception occurred while inserting CAN message record")
                 raise xsp.ConnectionProblem("Error while inserting CAN message records")
 
     def load_can_descriptors(self, config):
@@ -194,6 +193,18 @@ class XSPLogger(object):
                 self.poll_serial()
             except KeyboardInterrupt:
                 self.do_shutdown = True
+            if self.dirty and time.time() - self.last_commit >= 10:
+                try:
+                    self.db_connection.commit()
+                except:
+                    logging.exception("Error occurred while committing data")
+                    self.db_error_count += 1
+                    if self.db_error_count > self.DB_ERROR_LIMIT:
+                        logging.critical("Database error limit exceeded. Disconnecting.")
+                        self.disconnect_db()
+                else:
+                    self.last_commit = time.time()
+                    self.dirty = False
 
     def shutdown(self):
         self.handler.unbind()
@@ -209,7 +220,7 @@ class XSPLogger(object):
             cursor.execute("CREATE TABLE intervals (name text, start timestamp, end timestamp);")
 
         if tableExists(conn, "messages") and drop_tables:
-            cursor.execute("DROP TABLE ,essages;")
+            cursor.execute("DROP TABLE messages;")
         if not tableExists(conn, "messages"):
             cursor.execute("CREATE TABLE messages (id integer, name text, time timestamp, data text);")
         conn.commit()
@@ -219,6 +230,8 @@ class XSPLogger(object):
         self.load_can_descriptors({})
         if self.connect_db({'database': 'telemetry.db'}):
             self.config_database(self.db_connection)
+        else:
+            logging.critical("Failed to connect to database!")
             
         if self.connect_serial({'port': 'COM10', 'baudrate': 115200, 'timeout': 0}):
             self.handler.bind(self.serial_port)

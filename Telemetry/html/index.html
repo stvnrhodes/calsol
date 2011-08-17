@@ -1,0 +1,39 @@
+<html>
+    <head>
+        <title>Impulse Remote Dashboard</title>
+        <script type="text/javascript" src="js/jquery-1.6.2.min.js"></script>
+        <script type="text/javascript" src="js/remote.js"></script>
+        <script type="text/javascript" src="js/raphael.js"></script>
+        <script type="text/javascript" src="js/g.raphael.js"></script>
+        <script type="text/javascript" src="js/g.line.js"></script>
+
+        <script type="text/javascript">
+            window.onload = function() {
+                function on_update(interval) {
+                    var times = new Array(interval.points.length);
+                    var values = new Array(interval.points.length);
+                    for (var i=0; i < interval.points.length; i++) {
+                        var ts = interval.points[i][0];
+                        var millis = ts - interval.start;
+                        times[i] = millis;
+                        values[i] = interval.points[i][1];
+                    }
+                    console.log("Redrawing");
+                    plot.clear()
+                    plot.g.linechart(50, 0, 1150, 290, times, values, {y_limits: [100.0, 140.0],
+                                                                          axis: "0 0 1 1"});
+                }
+                plot = Raphael("plot", 1200, 320);
+                interval = new DataInterval("0x402", "Bus Voltage",
+                                                new Date("2011-08-13 21:00:00 GMT-0700"),
+                                                new Date("2011-08-13 23:00:00 GMT-0700"),
+                                                on_update);
+            };
+        </script>
+    </head>
+    <body>
+        <p>Test!</p>
+        <div id="plot"></div>
+        <button id="extend" onclick="interval.extendLeft(new Date('2011-08-12 1:00:00 GMT-0700'))">Extend left</button>
+    </body>
+</html>
