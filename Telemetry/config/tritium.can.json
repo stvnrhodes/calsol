@@ -3,8 +3,8 @@
     "name" : "Motor Drive Command",
     "format" : "ff",
     "messages" : [
-	["Motor Current", "percent", "Desired motor current set point as a percentage of maximum current setting."],
-      ["Motor Velocity", "m/s", "Desired motor velocity set point in metres/second."]
+	["Motor Current", "percent", "Desired motor current set point as a percentage (0.0-1.0) of maximum current setting."],
+      ["Motor Velocity", "m/s", "Desired motor velocity set point in rpm"]
       
     ],
     "description" : "The WaveSculptor motor controller must receive a Motor Drive Command frame at least once every 250ms. If this does not occur, the controller will assume that communications have failed and will halt all motor control functions, placing the system into neutral.",
