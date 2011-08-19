@@ -2,12 +2,14 @@
   "0x022" : {
     "name" : "Cutoff Emergency",
     "description" : "A critical error is detected and the cutoff will now shut down the car",
-    "source" : "Cutoff"
+    "source" : "Cutoff",
+    "format" : "B",
+    "messages": [["Error condition", "???", "???"]]
   },
 
   "0x042" : {
     "name" : "Cutoff Heartbeat",
-    "format" : "B7x",
+    "format" : "B",
     "messages" : [
       ["Flags", "heartbeat_bits", "Flags indicating the status of the cutoff module"]
     ],

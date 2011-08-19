@@ -137,7 +137,7 @@ def pollSerialData():
 if __name__ == '__main__':
     ser = serial.Serial(timeout=0)
     ser.baudrate = 57600
-    ser.port = 'COM4'
+    ser.port = 'COM10'
     ser.bytesize = 8
     ser.parity = 'N'
     ser.stopbits = 1
@@ -152,7 +152,7 @@ if __name__ == '__main__':
             break
         except struct.error as e:
             print e
-            raise e
+            #raise e
         except Exception as e:
             print e
     print 'end'
