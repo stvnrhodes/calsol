@@ -299,6 +299,13 @@
       ["Cell Voltage", "volt", "The battery cell voltage"]
     ]
   },
+   "0x12B" : {
+    "name" : "Battery Information Module 2 Cell 10",
+    "format" : "f",
+    "messages" : [
+      ["Cell Voltage", "volt", "The battery cell voltage"]
+    ]
+  },
   "0x12C" : {
     "name" : "Battery Information Module 2 External Temp 1",
     "format" : "f",
