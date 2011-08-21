@@ -338,26 +338,26 @@ void loop() {
     float dischargeV = 4.0;
     #ifdef BALANCE_MODE        
       float sumV = 0;
-      for(int i=0;i<length;i++) {
+      for(int i=0; i < length; i++) {
         sumV = sumV + cell_voltages[i];
         //Serial.println(sumV);
       }
-      averageV[k] = sumV/length;
-      //Serial.print(averageV[k]);
-      //Serial.println(" summed");
-      if(loops>2){
+      averageV[k] = sumV / length;
+      // Serial.print(averageV[k]);
+      // Serial.println(" summed");
+      if(loops > 2) {
         discharge = true;
-        dischargeV=(averageV[0]+averageV[1]+averageV[2])/3  + .01; //if more than .1V over average discharge
-        //Serial.print("Discharge Voltage: ");
-        //Serial.println(dischargeV);
-        if (dischargeV> 4.0){
-          dischargeV =  4.0;
+        // if more than .1V over average discharge
+        dischargeV = (averageV[0] + averageV[1] + averageV[2]) / 3  + .01;
+        // Serial.print("Discharge Voltage: ");
+        // Serial.println(dischargeV);
+        if (dischargeV > 4.0) {
+          dischargeV = 4.0;
         }
-      }
-      else{
+      } else {
         loops++; 
       }
-    #endif //BALANCE_MODE
+    #endif  // BALANCE_MODE
     if(discharge) {
       for(int i=0;i<length;i++) {
         if(cell_voltages[i] > dischargeV) {
