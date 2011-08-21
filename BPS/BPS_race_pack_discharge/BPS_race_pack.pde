@@ -1,3 +1,5 @@
+#define BALANCE_MODE
+
 #include "SPI.h"  
 // LTC6802-2 BMS with isolator installed 
 // pin 39 - SPI Clock 
@@ -152,6 +154,10 @@ void sendCAN(int ID,char*data,int size) {
 boolean checkOverVoltage(float*voltages,float limit,int length) {
   for(int i=0;i<length;i++) {
     if(voltages[i] >= limit) {
+      Serial.print("Index: ");
+      Serial.println(i);
+      Serial.print("Voltage: ");
+      Serial.println(voltages[i]);
       return true;
     }
   }
@@ -164,6 +170,8 @@ boolean checkUnderVoltage(float*voltages,float limit,int length) {
     if(voltages[i] <= limit) {
       Serial.print("Index: ");
       Serial.println(i);
+      Serial.print("Voltage: ");
+      Serial.println(voltages[i]);
       return true;
     }
   }
@@ -196,11 +204,15 @@ void setup() {
   SPI.setDataMode(SPI_MODE3);
   SPI.setBitOrder(MSBFIRST);
   delay(500);
+  config[0] = 0xE5;
+  writeConfig(config);
 }
+
+float averageV[3];
+int loops =0;
 
 void loop() {
   config[0] = 0xE5;
-  writeConfig(config);
   boolean discharge = false;
   boolean warning_ov = false;
   boolean warning_uv = false;
@@ -215,7 +227,7 @@ void loop() {
     if(k == 2) {
       length = 11;
     } else {
-      length = 12
+      length = 12;
     }
     
     // Ping the boards to make sure the config match
@@ -257,6 +269,8 @@ void loop() {
           error = true;
           delay(10);
           Serial.println("Overvoltage cells");
+          Serial.print("Pack: ");
+          Serial.println(k);
           delay(30000);
         } else {
           //if batteries over 4.05V create warning.
@@ -320,17 +334,54 @@ void loop() {
     }
     
     // Basic discharge, will discharge cells if voltage > 4.0V
+    
+    float dischargeV = 4.0;
+    #ifdef BALANCE_MODE        
+      float sumV = 0;
+      for(int i=0;i<length;i++) {
+        sumV = sumV + cell_voltages[i];
+        //Serial.println(sumV);
+      }
+      averageV[k] = sumV/length;
+      //Serial.print(averageV[k]);
+      //Serial.println(" summed");
+      if(loops>2){
+        discharge = true;
+        dischargeV=(averageV[0]+averageV[1]+averageV[2])/3  + .01; //if more than .1V over average discharge
+        //Serial.print("Discharge Voltage: ");
+        //Serial.println(dischargeV);
+        if (dischargeV> 4.0){
+          dischargeV =  4.0;
+        }
+      }
+      else{
+        loops++; 
+      }
+    #endif //BALANCE_MODE
     if(discharge) {
-      for(int i=0;i<12;i++) {
-        if(cell_voltages[i] > 4.0) {
+      for(int i=0;i<length;i++) {
+        if(cell_voltages[i] > dischargeV) {
+          Serial.print("Discharging: Cell ");
+          Serial.print(i);
+          Serial.print(" Pack ");
+          Serial.println(k);
           if(i < 8) {
             config[1] = config[1] | (1 << i); //Sets DCC bits 0-7
           } else {
             config[2] = config[2] | (1 << (i-8)); //Sets DCC bits 8-11
           }
         }
+        else{
+          if(i < 8) {
+            config[1] = config[1] & (0 << i); //Lower DCC bits 0-7
+          } else {
+            config[2] = config[2] & (0 << (i-8)); //Lower DCC bits 8-11
+          }
+        }
       }
     }
+    
+    writeConfig(config, k);
   }
   
   if ((millis() - lastHeartbeat) > heartrate) {
@@ -369,7 +420,7 @@ void loop() {
   }
   
   // Standby Configuration
-  if(!discharge) {
+  if(!discharge) { //if none discharging clear configs
     config[0] = 0xE0;
     config[1] = 0x00;     // Reset discharge bits
     config[2] = 0x00;     // Reset discharge bits
