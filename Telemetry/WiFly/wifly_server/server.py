@@ -14,7 +14,7 @@ class WiflyData():
   def __init__(self):
     # Stores unused data
     self.buf = ''
-    self.can_data = {}
+    self.can_data = {'0x1': 'ASDF'}
     
   def write(self, data):
     """Entry point for new data"""
@@ -94,10 +94,21 @@ class WiflyServer(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.end_headers()
       self.wfile.write(json.dumps(data.can_data))
     elif req_path == '/' or req_path == '/index.html':
-      self.send_response(200)
-      self.send_header('Content-type', 'text/html')
-      self.end_headers()
-      self.wfile.write('UNIMPLEMENTED')
+      try:
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(open('index.html').read())
+      except IOError:
+        self.send_error(404, 'index.html not found')
+    elif req_path == '/jquery.js':
+      try:
+        self.send_response(200)
+        self.send_header('Content-type', 'text/javascript')
+        self.end_headers()
+        self.wfile.write(open('jquery.js').read())
+      except IOError:
+        self.send_error(404, 'jquery.js not found')
     else:
       # Unknown path
       self.send_error(404, 'Reqeust not recognized')
