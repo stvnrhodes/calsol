@@ -1,0 +1,26 @@
+<html>
+<head>
+<title>CalSol WiFly Based Telemetry</title>
+<script src='/jquery.js'></script>
+<script>
+$(document).ready(function(){
+  $.get('/get', {}, function(data) {
+    $.each(data, function(key, value){
+      row = $('#data_table').append('<tr id="can_' + key + '"></tr>');
+      row.append('<td>' + key + '</td>');
+      row.append('<td>' + value + '</td>');
+    });
+  }, 'json')
+});
+</script>
+</head>
+<body>
+<table id='data_table'>
+  <thead>
+    <tr>
+      <th>CAN ID</th>
+      <th>Data</th>
+    </tr>
+  </thead>
+</body>
+</html>
