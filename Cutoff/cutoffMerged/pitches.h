@@ -1,3 +1,8 @@
+/* Note data used in playing songs for debugging and amusement purposed.
+This should probably eventually be moved to 
+EEPROM or other external memory
+*/
+
 /*************************************************
  * Public Constants
  *************************************************/
@@ -155,6 +160,7 @@ int badRomanceDuration[] = {
 
 int badRomanceSize = 65;
 
+/*Plays 3 beeps*/
 int beepDuration[] = {
  4, 8, 4};
 
