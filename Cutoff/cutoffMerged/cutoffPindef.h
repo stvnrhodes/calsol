@@ -13,7 +13,7 @@
 #define BUZZER   12
 //relays
 #define RELAY1   18
-#define RELAY2   19
+#define RELAY2   19  
 #define RELAY3   20  //no led
 #define LVRELAY  13
 //leds
@@ -68,5 +68,6 @@ void initPins() {
   digitalWrite(V1, HIGH);
   pinMode(V2, INPUT);
   digitalWrite(V2, HIGH);
+  //analogReference(INTERNAL); //use 2.56V reference for analog reads
 }
 #endif
