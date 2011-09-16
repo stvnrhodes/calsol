@@ -61,6 +61,7 @@ void process_packet(CanMessage &msg) {
       break;    
     
     /* Emergencies */
+    // Emergency messages recieved from any board will cause the car to shut down.
     case CAN_EMER_BPS:
       bps_code = msg.data[0];
       emergency = 1;      
@@ -99,13 +100,13 @@ void process_packet(CanMessage &msg) {
 /* It handles reinitializing all variables and pins*/
 void initialize(){
   Serial.println("Initializing");
-  initPins();
-  initVariables();
+  initPins();           //set all pins to their default configurations and values
+  initVariables();      //set all variables to their default values
   lastShutdownReason(); //print out reason for last shutdown
   prepShutdownReason(); //increment the position in shutdown log.
   /* Precharge */
-  lastState=TURNOFF;//initialize in off state if key is off.
-  if (checkOffSwitch()){
+  lastState=TURNOFF;  //last state was off
+  if (checkOffSwitch()){ //initialize in off state if key is off.
     state=TURNOFF;
   }
   else{
@@ -122,7 +123,7 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Powering Up");  
   initialize(); //initialize pins and variables to begin precharge state.  
-  initCAN();
+  initCAN(); //initialize CAN configurations
 }
 
 
@@ -132,19 +133,19 @@ void setup() {
 void loop() {
   /* Perform state fuctions and update state */
     switch (state) {
-      case PRECHARGE:
+      case PRECHARGE: //this is the startup state of the car
         do_precharge();
         break;
-      case NORMAL:
+      case NORMAL: //this is the normal operation state of the car
         do_normal();        
         break;
-      case TURNOFF:
+      case TURNOFF: //this is the standard shutdown state which will allow the car to turn back on
         do_turnoff();
         break;
-      case ERROR:
+      case ERROR: //this is the error shutdown state which will not permit the car to turn back on
         do_error();
         break;
-      default:
+      default:  //the default state should not be used unless there is a coding error
         #ifdef DEBUG
           Serial.println("Defaulted to error state.   There must be a coding issue.");
         #endif

@@ -15,25 +15,25 @@
 
 /* State variables */
 
-unsigned long startTime = 0;
-unsigned long prechargeTime =0;
+unsigned long startTime = 0; //the time at which the car started up
+unsigned long prechargeTime =0; //the time at which the precharge voltage was reached
 
-volatile unsigned long last_readings = 0;
-volatile unsigned long last_heart_bps = 0;
-volatile unsigned long last_heart_driver_io = 0;
-volatile unsigned long last_heart_driver_ctl = 0;
-volatile unsigned long last_heart_telemetry = 0;
-volatile unsigned long last_heart_datalogger = 0;
-volatile unsigned long last_heart_cutoff = 0;
-volatile unsigned long last_can = 0;
-volatile unsigned long last_printout = 0;
-volatile int emergency = 0;
-volatile int warning = 0;
-volatile int bps_code = 0;
+volatile unsigned long last_readings = 0;  //the last time at which the cutoff sent out current and voltage readings
+volatile unsigned long last_heart_bps = 0;  //the last time at which a bps heartbeat was received
+volatile unsigned long last_heart_driver_io = 0;  //the last time at which a Driver IO heartbeat was received
+volatile unsigned long last_heart_driver_ctl = 0;  //the last time at which a Driver Controls heartbeat was received
+volatile unsigned long last_heart_telemetry = 0;  //the last time at which a telemetry heartbeat was received
+volatile unsigned long last_heart_datalogger = 0;  // the last time at which a datalogger heartbeat was received
+volatile unsigned long last_heart_cutoff = 0;  //the last time at which the cutoff sent out a heartbeat
+volatile unsigned long last_can = 0;        //time at which the last CAN message was received
+volatile unsigned long last_printout = 0;   //time at which last printout of number of heartbeats was made
+volatile int emergency = 0;                  //emergency flag
+volatile int warning = 0;    //warning flag
+volatile int bps_code = 0;    //stores the message data contained in any bps error messages
 int numHeartbeats = 0; //number of bps heartbeats recieved
-char precharge_voltage_reached = 0;
+char precharge_voltage_reached = 0; //flag to indicate if we've already reached the precharge voltage
 
-enum STATES {
+enum STATES { //a list of all of the states of the car
   PRECHARGE,
   NORMAL,
   TURNOFF,
@@ -42,7 +42,7 @@ enum STATES {
 
 enum STATES lastState; //keep track of last state.  This simplifies our state machine a little, but is really adding more states.
 
-enum SHUTDOWNREASONS {
+enum SHUTDOWNREASONS { //a list of all valid shutdown reasons
   POWER_LOSS,
   KEY_OFF,
   BPS_HEARTBEAT,
@@ -138,19 +138,21 @@ unsigned long warningTime = 0; //play buzzer/keep LED on until this time is reac
 unsigned long shortWarning = 100; //play buzzer for a short duration
 unsigned long longWarning = 500; //play buzzer for slightly longer duration
 
-boolean playingSong = false;
-boolean playingError = false;
-int* duration;
-int* notes;
-int songSize;
-int currentNote=0;
-long endOfNote=0;
-float songTempo =1;
+boolean playingSong = false; //keep track of whether a song is currently being played
+boolean playingError = false; //keep track of whether an error noise is currently being played
+int* duration; //an array of the lengths of notes in a song
+int* notes; //an array of the notes in a song
+int songSize; //length of a song in number of notes
+int currentNote=0; //current note loaded in a song
+long endOfNote=0; //time at which to end the current note
+float songTempo =1; //the relative speed to play a song at
 
-void process_packet(CanMessage &msg);
+void process_packet(CanMessage &msg);  //prototype for CAN interpretation function
 
-void initialize();
 
+void initialize(); //prototype for initialization function to be called on car reset
+
+//configure CAN connection
 void initCAN(){
    /* Can Initialization w/ filters */
   Can.reset();
@@ -164,8 +166,9 @@ void initCAN(){
   CanBufferInit(); 
 }
 
-void tone(uint8_t _pin, unsigned int frequency, unsigned long duration);
+void tone(uint8_t _pin, unsigned int frequency, unsigned long duration); //prototype for tone function
 
+//raise a level 1 warning
 inline void raiseWarning(int warningID){
   if (!playingError){  
     playingError =true;
@@ -178,6 +181,7 @@ inline void raiseWarning(int warningID){
   }
 }
 
+//raise a level 2 warning
 inline void raiseError(int warningID){  //Level 2 Warning: not currently used by BPS
   if (!playingError){
     playingError =true;  
@@ -192,7 +196,7 @@ inline void raiseError(int warningID){  //Level 2 Warning: not currently used by
 
 /*Music Functions */
 
-//play tetris
+//prep tetris song
 void loadTetris(){     
   if (!playingSong) {
     playingSong = true;
@@ -203,6 +207,7 @@ void loadTetris(){
   } 
 }
 
+//prep 3 beep noise to indicate bad CAN communication
 void loadBadCan() {
   if (!playingSong) {
     playingSong = true;
@@ -214,7 +219,7 @@ void loadBadCan() {
   }
 }
 
-//play BadRomance
+//prep badRomance to play next
 void loadBadRomance(){
       //play bad romance
       if (!playingSong) {
@@ -227,6 +232,8 @@ void loadBadRomance(){
       }
 }
 
+//updates the buzzer to make it play the next notes in the currently loaded song
+//does not use delays so should have minimal effect on code execution time
 void playSongs(){
 //shut off buzzer/LED if no longer sending warning
         if (playingError &&(millis() > warningTime)){
@@ -282,6 +289,7 @@ long readC1() {
   long c1 = cRead * 5 * 1000 / 1023;
   long cGND = gndRead * 5 * 1000 / 1023;
   long current = 80 * (c1 - cGND); //Scaled over 25 ohm resistor. multiplied by 1000 V -> mV conversion
+                                   //this current sensor uses a 1:2000 conversion
   return current;
 }
 
@@ -292,6 +300,7 @@ long readC2() {
   long c1 = cRead * 5 * 1000 / 1023;
   long cGND = gndRead * 5 * 1000 / 1023;
   long current = 40 * (c1 - cGND); //Scaled over 25 ohm resistor. multiplied by 1000 V -> mV conversion
+                                   //this current sensor uses a 1:1000 conversion
   return current;
 }
 
@@ -315,6 +324,8 @@ char checkOffSwitch(){
       return 0;
 }
 
+//checks to make sure system voltage (and current) are in acceptable levels
+//current currently disabled, relies on fuse instead
 void checkReadings() {
   CanMessage msg = CanMessage();
   long batteryV = readV1();
@@ -351,6 +362,7 @@ void checkReadings() {
   }*/ //disabled until current sensors reliable
 }
 
+//encodes two flots into the proper format to send over CAN
 void floatEncoder(CanMessage &msg,float f1, float f2) {
   /*float *floats = (float*)(msg.data);
   floats[0] = f1;
@@ -366,6 +378,7 @@ void floatEncoder(CanMessage &msg,float f1, float f2) {
   msg.data[7] = *(((char *)&f2)+3);
 }
 
+//sends system voltage readings over CAN
 void sendVoltages(){
   CanMessage msg = CanMessage();
   long v1 = readV1(); //get Voltage 1 (in mV)
@@ -400,6 +413,7 @@ void sendVoltages(){
   
 }
 
+//sends system current readings over CAN
 void sendCurrents(){
   CanMessage msg = CanMessage();
   long c1 = readC1();
@@ -442,6 +456,7 @@ void sendReadings() {
 }
 
 
+//sends a cutoff heartbeat over CAN
 void sendHeartbeat() {
   CanMessage msg;
   msg.id = CAN_HEART_CUTOFF;
@@ -450,6 +465,7 @@ void sendHeartbeat() {
   Can.send(msg);
 }
 
+//initialize all variables to ensure the car always starts up/restarts in the same state.
 void initVariables(){
   last_readings = 0;
   last_heart_bps = 0;
@@ -615,6 +631,7 @@ void do_normal() {
   playSongs();
 }
 
+//prints out the last shutdown reason
 void lastShutdownReason(){
   unsigned int memoryIndex = EEPROM.read(0);
   if (memoryIndex > 50){//in case EEPROM data is bad
@@ -626,6 +643,7 @@ void lastShutdownReason(){
   
 }
 
+//prints out the last 50 shutdown reasons
 void shutdownLog(){
   unsigned int memoryIndex = EEPROM.read(0);
   if (memoryIndex>50 || memoryIndex ==0){ //invalid value, start at 1
@@ -643,7 +661,8 @@ void shutdownLog(){
   }
 }
 
-void prepShutdownReason(){ //move to next index for shutdown reason
+//move to next index for shutdown reason
+void prepShutdownReason(){ //increments position in the shutdown log
   unsigned int memoryIndex = EEPROM.read(0); 
   memoryIndex++; //go to next unused memory position
   if (memoryIndex > 50){ memoryIndex =1;} //valid index positions 1 - 50
@@ -651,6 +670,7 @@ void prepShutdownReason(){ //move to next index for shutdown reason
   EEPROM.write(memoryIndex, POWER_LOSS); //if no other shutdown reason specified, assume power loss.
 }
 
+//writes the current shutdown reason to the shutdown log in EEPROM
 void recordShutdownReason(){ //requires prepShutdownReason to increment memory Index.
   unsigned int memoryIndex = EEPROM.read(0); 
   if (memoryIndex > 50){ memoryIndex =1;} //valid index positions 1 - 50
@@ -683,11 +703,12 @@ void do_turnoff() {
     //allow to restart car if powered by USB
     initialize();
     //state = PRECHARGE;  //included in initialize function
-  }    
+  }   
   
 }
 
 /* Something bad has happened, we must beep loudly and turn the car off */
+/* this code must never allow to change the state, forcing a hard reset of the car */
 void do_error() {
   if (lastState!=ERROR){  //do these only when entering the error state
     //turn off relays first
@@ -697,28 +718,28 @@ void do_error() {
     digitalWrite(LVRELAY, LOW);
     digitalWrite(LEDFAIL, HIGH);
     
-    if (shutdownReason==BPS_EMERGENCY_OTHER){  
+    if (shutdownReason==BPS_EMERGENCY_OTHER){  //If the shutdown reason is a BPS emergency determine which type
       #ifdef DEBUG
          Serial.print("\tBPS Code: ");  
          Serial.println(bps_code & 0xFF, HEX); //print identifier of BPS error
       #endif
-      if (bps_code == 0x01)
+      if (bps_code == 0x01) //battery overvoltage case
         shutdownReason=BPS_OVERVOLT;
-      else if (bps_code == 0x02)
+      else if (bps_code == 0x02) //battery undervoltage case
         shutdownReason=BPS_UNDERVOLT;
-      else if (bps_code == 0x04)
+      else if (bps_code == 0x04) //battery overtemperature case
         shutdownReason=BPS_OVERTEMP;
-      else
+      else                      //other BPS emergency, unknown.
        shutdownReason=BPS_EMERGENCY_OTHER;      
     }
     
-    if (shutdownReason==BPS_HEARTBEAT ){
+    if (shutdownReason==BPS_HEARTBEAT ){ //If we shut down from missing BPS heartbeat play bad romance
       loadBadRomance();
     }
-    else if (shutdownReason == BAD_CAN) {
+    else if (shutdownReason == BAD_CAN) { //if we shut down due to CAN communication errors, beep 3 times
       loadBadCan();
     }
-    else{      
+    else{  //all other reasons we'll just beep/play tetris    
       digitalWrite(BUZZER, HIGH);  //for people who can't tell difference between bad romance and tetris
       //loadTetris(); 
     }
@@ -739,6 +760,8 @@ void do_error() {
   state=ERROR; //ensure we will not leave the error state
 }
 
+//reads from EEPROM the last BPS warning that was received.   This is useful
+//for debugging via USB when the warning noise is heard.
 void printLastWarning(){
   unsigned int warningID = EEPROM.read(51);
   switch (warningID){
@@ -758,7 +781,10 @@ void printLastWarning(){
   }      
 }
 
+//interprets any messages received over the USB serial line.
 inline void processSerial(){
+  /*Serial commands include "l" for shutdown error log of last 50 shutdown reasons
+  and "w" for the last battery warning message received by the board.*/
   if(Serial.available()){
     char letter= Serial.read();
     if(letter=='l'){
@@ -770,6 +796,7 @@ inline void processSerial(){
   }
 }
 
+//handles sending out all CAN messages from the cutoff
 inline void sendCutoffCAN(){
   if (millis() - last_heart_cutoff > 200) {  //Send out the cutoff heartbeat to anyone listening.  
     last_heart_cutoff = millis();
