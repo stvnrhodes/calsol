@@ -16,6 +16,7 @@
 /* State variables */
 
 unsigned long startTime = 0;
+unsigned long prechargeTime =0;
 
 volatile unsigned long last_readings = 0;
 volatile unsigned long last_heart_bps = 0;
@@ -30,6 +31,7 @@ volatile int emergency = 0;
 volatile int warning = 0;
 volatile int bps_code = 0;
 int numHeartbeats = 0; //number of bps heartbeats recieved
+char precharge_voltage_reached = 0;
 
 enum STATES {
   PRECHARGE,
@@ -57,7 +59,7 @@ enum SHUTDOWNREASONS {
   OTHER1_EMERGENCY,
   OTHER2_EMERGENCY,
   OTHER3_EMERGENCY,
-  BPS_ERROR,
+  BPS_ERROR, //critical heartbeat
   BAD_CAN,
   CODING_ERROR
 } shutdownReason;
@@ -65,7 +67,9 @@ enum SHUTDOWNREASONS {
 
 /* Shutdown Reason Error Codes */  
 /* these are stored in program memory to decrease SRAM usage */
-prog_char reason_POWER_LOSS[]          PROGMEM = "Loss of power to cutoff.  Possibly due to bomb switch.";
+/* otherwise we run out of RAM, the board acts strangely and resets */
+/* lesson learned, don't do too many serial prints */
+prog_char reason_POWER_LOSS[]          PROGMEM = "Manual reset, power loss or runtime error. Check bomb switch.";
 prog_char reason_KEY_OFF[]             PROGMEM = "Normal Shutdown.  Key in off position."; 
 prog_char reason_BPS_HEARTBEAT[]       PROGMEM = "Missing BPS heartbeat."; 
 prog_char reason_S_UNDERVOLT[]         PROGMEM = "High voltage line undervoltage."; 
@@ -116,12 +120,14 @@ unsigned int numErrorCodes=20; //number of valid shutdown types
 /* Prints out the shutdown Reason */
 /* strings containing error messages are contained in program memory to save SRAM space */
 void printShutdownReason(unsigned int shutdownReason){
-  char buffer[55]; //create a buffer to hold our error string  
+  char buffer[80]; //create a buffer to hold our error string  
+  Serial.print("Shutdown Reason ");
+  Serial.print(shutdownReason, DEC); //print ID of shutdown error
+  Serial.print(": "); 
   if (shutdownReason>=numErrorCodes){
-    shutdownReason =numErrorCodes; //if we have an invalid shutdownReason, set the reason to unknown
+    shutdownReason =numErrorCodes-1; //if we have an invalid shutdownReason, set the reason to unknown
   }
-  strcpy_P(buffer, (char*)pgm_read_word(&(errorCode_lookup[shutdownReason])));  //copy the error code from program memory into our buffer c string.
-  Serial.print("Shutdown Reason: ");  
+  strcpy_P(buffer, (char*)pgm_read_word(&(errorCode_lookup[shutdownReason])));  //copy the error code from program memory into our buffer c string.    
   Serial.println( buffer ); //print out the error message
 }
 
@@ -216,7 +222,7 @@ void loadBadRomance(){
         duration = badRomanceDuration;
         notes = badRomanceNotes;
         songSize = badRomanceSize;
-        songTempo= .5; //play at half speed
+        songTempo= .75; //play at slower speed
         currentNote = 0;        
       }
 }
@@ -253,7 +259,7 @@ long readV1() {
   long voltage = reading * 5 * 1000 / 1023 ;  
   // 2.7M+110K +470K/ 110K Because a fuse kept blowing We also added
   // in another resistor to limit the current (470K).
-  voltage = voltage * (270+10.8) / 10.8; // 2.7M+110K / 110K   voltage divider
+  voltage = voltage * (270+3.9) / 3.9; // 2.7M+390K / 110K   voltage divider
   return voltage ;
 }
 
@@ -263,7 +269,7 @@ long readV2() {
   long voltage = reading * 5 *1000 / 1023 ;  
   // 2.7M+110K +470K/ 110K Because a fuse kept blowing We also added
   // in another resistor to limit the current (470K).
-  voltage = voltage * (270+10.8) / 10.8; // 2.7M+110K / 110K   voltage divider
+  voltage = voltage * (270+3.9) / 3.9; // 2.7M+390K / 110K   voltage divider
   return voltage; 
 }
 
@@ -275,7 +281,7 @@ long readC1() {
   //Serial.println(gndRead);
   long c1 = cRead * 5 * 1000 / 1023;
   long cGND = gndRead * 5 * 1000 / 1023;
-  long current = 40 * (c1 - cGND); //Scaled over 25 ohm resistor. multiplied by 1000 V -> mV conversion
+  long current = 80 * (c1 - cGND); //Scaled over 25 ohm resistor. multiplied by 1000 V -> mV conversion
   return current;
 }
 
@@ -458,7 +464,9 @@ void initVariables(){
   bps_code = 0;
   shutdownReason = CODING_ERROR; //if no other reason is specified, the code on cutoff has an error
   playingError = false;
+  prechargeTime =0;
   startTime=millis();
+  precharge_voltage_reached = false;
 }
 
 /* Does the precharge routine: Wait for motor voltage to reach a threshold,
@@ -467,15 +475,12 @@ void do_precharge() {
   #ifdef DEBUG_STATES
     Serial.println("in precharge");
   #endif
-  digitalWrite(LED1, HIGH);
   lastState=PRECHARGE;
-  last_heart_bps = 0; //reset heartbeat tracking
   long prechargeV = (readV1() / 1000.0); //milliVolts -> Volts
   long batteryV = (readV2() / 1000.0); //milliVolts -> Volts
   int prechargeTarget = 90; //~100V ?
   int voltageDiff= abs(prechargeV-batteryV);
   
-  lastState= PRECHARGE;
   if ( checkOffSwitch() ) {
     /* Off switch engaged, Transition to off */
     state = TURNOFF; //actually redundant
@@ -484,6 +489,8 @@ void do_precharge() {
   else if ((prechargeV < prechargeTarget)  || (voltageDiff>3) 
       || (millis()-startTime < 1000)) { //wait for precharge to bring motor voltage up to battery voltage  
     /* Precharge incomplete */
+    
+    digitalWrite(LED1, HIGH);
     #ifdef DEBUG
       Serial.print("Precharge State -- Motor Voltage: ");
       Serial.print(prechargeV, DEC);
@@ -494,54 +501,68 @@ void do_precharge() {
     #endif
     state = PRECHARGE;
   }
-  else {
-    /* Precharge complete */
-    #ifdef DEBUG
-      Serial.print("Precharge Voltage Reached: ");
-      Serial.print(prechargeV);
-      Serial.println("V");
-    #endif
-    /* Turn on relays, delay put in place to avoid relay current spike */
-    digitalWrite(RELAY1, HIGH);
-    delay(100);
-    digitalWrite(RELAY2, HIGH);
-    delay(100);
-    digitalWrite(LVRELAY, HIGH);
+  else { //precharge voltage has been reached, wait for CAN   
     
-    // Hack to wait until the BPS turns on
-   unsigned int waiting= millis();
-   while(!last_heart_bps) {
-     if(millis()-waiting>10000){ //10 second timeout
-       shutdownReason=BPS_HEARTBEAT;
-       state=ERROR;
-       return;       
+      if(!precharge_voltage_reached){  //if this is the first time we've reached the precharge voltage
+        /* Precharge complete */
+          /* do once */
+        digitalWrite(LED1, LOW);
+        digitalWrite(LED2, HIGH);
+        #ifdef DEBUG
+          Serial.print("Precharge Voltage Reached: ");
+          Serial.print(prechargeV);
+          Serial.println("V");
+        #endif
+        /* Turn on relays, delay put in place to avoid relay current spike */
+        digitalWrite(RELAY1, HIGH);
+        delay(100);
+        digitalWrite(RELAY2, HIGH);
+        delay(100);
+        digitalWrite(LVRELAY, HIGH);
+        precharge_voltage_reached = true; //set flag true to show we've turned on system
+        prechargeTime=millis();
+      }
+     
+      
+     if(!last_heart_bps) { //initial wait for precharge is 10 seconds
+       long waitingTime =millis()-prechargeTime;
+       if(waitingTime>10000){ //10 second timeout
+         shutdownReason=BPS_HEARTBEAT;
+         state=ERROR;
+         return;       
+       }
+       else{
+        #ifdef DEBUG_CAN
+          Serial.print("Last can: ");
+          Serial.println(last_can);     
+        #endif
+        delay(10); 
+       }
      }
-     else{
-      #ifdef DEBUG_CAN
-        Serial.print("Last can: ");
-        Serial.println(last_can);
-      #endif
-      delay(10); 
-     }
-   }
-    
-    /* Sound buzzer */
-    digitalWrite(BUZZER, HIGH);
-    delay(100);
-    digitalWrite(BUZZER, LOW);
-    delay(50);
-    digitalWrite(BUZZER, HIGH);
-    delay(100);
-    digitalWrite(BUZZER, LOW);
-    delay(50);
-    digitalWrite(BUZZER, HIGH);
-    delay(100);
-    digitalWrite(BUZZER, LOW);
-    
-    /* State Transition */
-    state = NORMAL;
+     else{ //if bps heartbeat received
+      /* Sound buzzer */
+      digitalWrite(BUZZER, HIGH);
+      delay(100);
+      digitalWrite(BUZZER, LOW);
+      delay(50);
+      digitalWrite(BUZZER, HIGH);
+      delay(100);
+      digitalWrite(BUZZER, LOW);
+      delay(50);
+      digitalWrite(BUZZER, HIGH);
+      delay(100);
+      digitalWrite(BUZZER, LOW);  
+      
+      digitalWrite(LED2, LOW);
+      /* State Transition */
+      state = NORMAL;
+    }
   }
 }
+
+
+
+
 
 /* Car running state, check for errors, otherwise continue operation */
 void do_normal() {
@@ -554,6 +575,8 @@ void do_normal() {
   volatile unsigned long LastHeartbeat= last_heart_bps;
   volatile unsigned long timeNow = millis();
   volatile long timeLastHeartbeat = timeNow - LastHeartbeat;
+  
+  
   if ( emergency ) { //check for emergency
     state = ERROR;
     //msg.id = CAN_EMER_CUTOFF;
@@ -604,22 +627,34 @@ void lastShutdownReason(){
 }
 
 void shutdownLog(){
-  int memoryIndex = EEPROM.read(0);
-  for(int i=1;i<=50; i++){ 
-    if (memoryIndex>50){
-      memoryIndex=1;
+  unsigned int memoryIndex = EEPROM.read(0);
+  if (memoryIndex>50 || memoryIndex ==0){ //invalid value, start at 1
+    memoryIndex = 1;
+  }
+  memoryIndex--; //Start with the last shutdown reason, not the currently prepped one.  
+  for(int i=1;i<=49; i++){ 
+    if (memoryIndex<1){
+      memoryIndex=50;
     }
+
     unsigned int lastReason = EEPROM.read(memoryIndex);
     printShutdownReason(lastReason);
-    memoryIndex++;
+    memoryIndex--;
   }
 }
 
-void recordShutdownReason(){
-  int memoryIndex = EEPROM.read(0); 
-  if (memoryIndex >= 50){ memoryIndex =0;}
-  EEPROM.write(0, memoryIndex+1);
-  EEPROM.write(memoryIndex+1, shutdownReason);
+void prepShutdownReason(){ //move to next index for shutdown reason
+  unsigned int memoryIndex = EEPROM.read(0); 
+  memoryIndex++; //go to next unused memory position
+  if (memoryIndex > 50){ memoryIndex =1;} //valid index positions 1 - 50
+  EEPROM.write(0, memoryIndex); //record current position in error log
+  EEPROM.write(memoryIndex, POWER_LOSS); //if no other shutdown reason specified, assume power loss.
+}
+
+void recordShutdownReason(){ //requires prepShutdownReason to increment memory Index.
+  unsigned int memoryIndex = EEPROM.read(0); 
+  if (memoryIndex > 50){ memoryIndex =1;} //valid index positions 1 - 50
+  EEPROM.write(memoryIndex, shutdownReason); //record shutdown reason
 }
 
 /* Turn the car off normally */
@@ -676,14 +711,16 @@ void do_error() {
       else
        shutdownReason=BPS_EMERGENCY_OTHER;      
     }
-	 else if (shutdownReason==BPS_HEARTBEAT){
+    
+    if (shutdownReason==BPS_HEARTBEAT ){
       loadBadRomance();
     }
-	 else if (shutdownReason == BAD_CAN) {
+    else if (shutdownReason == BAD_CAN) {
       loadBadCan();
     }
-    else{
-      loadTetris(); 
+    else{      
+      digitalWrite(BUZZER, HIGH);  //for people who can't tell difference between bad romance and tetris
+      //loadTetris(); 
     }
     recordShutdownReason();
     printShutdownReason(shutdownReason);

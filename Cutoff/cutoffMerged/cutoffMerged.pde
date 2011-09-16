@@ -26,30 +26,25 @@ void process_packet(CanMessage &msg) {
     case CAN_HEART_BPS:
       last_heart_bps = last_can;
       numHeartbeats++;
-      bps_code = msg.data[0];     
-      switch( bps_code){
-        case 0x00:
-          /* normal operation */
-          break;
-        case 0x01:
+      warning = msg.data[0];  
+      //if warning = 0 normal heartbeat   
+      if (warning== 0x01){                 
           /* BPS Undervolt Warning flag */
           warning = 1; 
-          break;  
-        case 0x02:
+      }  
+      else if(warning== 0x02){
           /* BPS Overvoltage Error */
           warning = 2;
-          break;
-        case 0x03:
+      }
+      else if (warning == 0x03){
           /* BPS Temperature Error */
           warning = 3;
-          break;
-        case 0x04:
+      }
+      else if (warning == 0x04){
           /* BPS Critical error flag */
+          warning =0;
           shutdownReason=BPS_ERROR;
           emergency = 1;
-          break;
-        default:
-          break;
       }
       break;
     case CAN_HEART_DRIVER_IO:
@@ -107,6 +102,7 @@ void initialize(){
   initPins();
   initVariables();
   lastShutdownReason(); //print out reason for last shutdown
+  prepShutdownReason(); //increment the position in shutdown log.
   /* Precharge */
   lastState=TURNOFF;//initialize in off state if key is off.
   if (checkOffSwitch()){
