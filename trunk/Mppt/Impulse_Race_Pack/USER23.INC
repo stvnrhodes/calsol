@@ -28,7 +28,10 @@
 ;**********************************************************************
 ;   maximum battery voltage
 ;**********************************************************************
-#define INITDUTY	0x53		; Duty resulting of Ubat and Uoc.
+#define INITDUTY	0x89		; Duty resulting of Ubat and Uoc.
+								;I think it does 0x25 for UI>70V
+								;0x5b for UI>50V
+								;0x89 for UI<50V
 #define MAXUOH		0x02		; 145.17 V: Max Batt. volt HByte 
 					; in 196.97 mV Units
 #define MAXUOL		0xE1		; 145.17 V: Max Batt. volt LByte in
