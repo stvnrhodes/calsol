@@ -1,0 +1,311 @@
+/* CalSol - UC Berkeley Solar Vehicle Team 
+ * bps.h - BMS Module
+ * Purpose: Helper methods for BPS functions of the BMS
+ * Author(s): Ryan Tseng, Stephen Chen
+ * Date: Sept 25th 2011
+ */
+ 
+#ifndef _BPS_H_
+#define _BPS_H_
+
+#include "SPI.h"  
+#include "pindef.h"
+
+// Macros for beginning and ending LT SPI transmission
+#define LT_SPI_START digitalWrite(LT_CS,LOW)
+#define LT_SPI_END digitalWrite(LT_CS,HIGH)
+
+// Utility macros
+#define MAX(A, B) (A > B) ? A : B
+#define min(A, B) (A < B) ? A : B
+
+// Control Bytes 
+#define WRCFG 0x01   // Write config 
+#define RDCFG 0x02   // Read config 
+#define RDCV  0x04   // Read cell voltages 
+#define RDFLG 0x06   // Read voltage flags 
+#define RDTMP 0x08   // Read temperatures  
+#define STCVAD 0x10  // Start cell voltage A/D conversion 
+#define STTMPAD 0x30 // Start temperature A/D conversion  
+#define DSCHG 0x60   // Start cell voltage A/D allowing discharge
+
+// Configuration constants
+#define OVERVOLTAGE_WARNING_LEVEL  4.1
+#define OVERVOLTAGE_ERROR_LEVEL    4.2
+#define UNDERVOLTAGE_WARNING_LEVEL 3.0
+#define UNDERVOLTAGE_ERROR_LEVEL   2.7
+#define OVERTEMP_WARNING_LEVEL 50
+#define OVERTEMP_ERROR_LEVEL 55
+
+// LT board constants
+const byte board_address[3] = { 0x80 , 0x81 , 0x82 };
+const byte OV = 0xAB;  // 4.1V
+const byte UV = 0x71;  // 2.712V
+const float over = 4.1;
+const float under = 2.7;
+const int B = 3988;
+
+byte config[6] = { 0xE5,0x00,0x00,0x00,UV,OV };  //Default config
+
+// Global flags
+int overtemp_error = 0;
+int overtemp_warning = 0;
+int overvolt_error = 0;
+int overvolt_warning = 0;
+int undervolt_error = 0;
+int undervolt_warning = 0;
+int system_error = 0;
+
+// Global variables
+float battery_voltages[3][12];
+float temperatures[3][3];
+int can_current_module = 0;
+
+// Write config to the LT board's configuration
+void writeConfig(byte* config) {
+  LT_SPI_START;
+  SPI.transfer(WRCFG);  // Configuration is written to all chips
+  for(int i=0; i<6; i++) {
+    SPI.transfer(config[i]);
+  }
+  LT_SPI_END; 
+}
+
+// Write config to a single board
+void writeConfig(byte* config, byte board) {
+  LT_SPI_START;
+  SPI.transfer(board);  // Non-broadcast command
+  SPI.transfer(WRCFG);  // Configuration is written to all chips
+  for(int i=0; i<6; i++) {
+    SPI.transfer(config[i]);
+  }
+  LT_SPI_END; 
+}
+
+// Read the configuration for a board
+void readConfig(byte*config,byte board) {
+  LT_SPI_START;   
+  SPI.transfer(board);  // Board address is selected
+  SPI.transfer(RDCFG);  // Configuration is read
+  for(int i=0; i<6; i++) {
+    config[i] = SPI.transfer(RDCFG);
+  }
+  LT_SPI_END;
+}
+
+// Begins CV A/D conversion
+void beginCellVolt() {
+  LT_SPI_START;
+  SPI.transfer(STCVAD);
+  delay(15); //Time for conversions, approx 12ms
+  LT_SPI_END;
+}
+
+// Reads cell voltage registers  
+void readCellVolt(float* cell_voltages, byte board) {
+  LT_SPI_START;
+  SPI.transfer(board);  // Board address is selected
+  SPI.transfer(RDCV);  // Cell voltages to be read
+  byte cvr[18];  // Buffer to store unconverted values
+  for(int i=0;i<18;i++) {
+    cvr[i] = SPI.transfer(RDCV);
+  }
+  LT_SPI_END; 
+
+  // Converting cell voltage registers to cell voltages
+  cell_voltages[0] = (cvr[0] & 0xFF) | (cvr[1] & 0x0F) << 8;
+  cell_voltages[1] = (cvr[1] & 0xF0) >> 4 | (cvr[2] & 0xFF) << 4;
+  cell_voltages[2] = (cvr[3] & 0xFF) | (cvr[4] & 0x0F) << 8;
+  cell_voltages[3] = (cvr[4] & 0xF0) >> 4 | (cvr[5] & 0xFF) << 4;
+  cell_voltages[4] = (cvr[6] & 0xFF) | (cvr[7] & 0x0F) << 8;
+  cell_voltages[5] = (cvr[7] & 0xF0) >> 4 | (cvr[8] & 0xFF) << 4;
+  cell_voltages[6] = (cvr[9] & 0xFF) | (cvr[10] & 0x0F) << 8;
+  cell_voltages[7] = (cvr[10] & 0xF0) >> 4 | (cvr[11] & 0xFF) << 4;
+  cell_voltages[8] = (cvr[12] & 0xFF) | (cvr[13] & 0x0F) << 8;
+  cell_voltages[9] = (cvr[13] & 0xF0) >> 4 | (cvr[14] & 0xFF) << 4;
+  cell_voltages[10] = (cvr[15] & 0xFF) | (cvr[16] & 0x0F) << 8;
+  cell_voltages[11] = (cvr[16] & 0xF0) >> 4 | (cvr[17] & 0xFF) << 4;
+  
+  for(int i=0;i<12;i++) {
+    cell_voltages[i] = cell_voltages[i]*1.5*0.001;
+  }
+}  
+
+void beginTemp() {
+  LT_SPI_START;
+  SPI.transfer(STTMPAD);
+  delay(15); //Time for conversions
+  LT_SPI_END;
+}
+
+// Converts external thermistor voltage readings 
+// into temperature (K) using B-value equation
+void convertVoltTemp(short* volt, float* temp) {
+  float resist[2];
+  resist[0] = (10000 / ((3.11/(volt[0]*1.5*0.001))-1));
+  resist[1] = (10000 / ((3.11/(volt[1]*1.5*0.001))-1));
+  float rinf = 10000 * exp(-1*(B/298.15));
+  temp[0] = (B/log(resist[0]/rinf)) - 273.15;
+  temp[1] = (B/log(resist[1]/rinf)) - 273.15;
+  temp[2] = (volt[2]*1.5*0.125) - 273;
+}
+
+//Reads temperatures
+void readTemp(float* temperatures, byte board) {
+  short raw_temperatures[3];
+  // Start Temperature ADC conversions
+  beginTemp();
+  LT_SPI_START;
+  SPI.transfer(board); //board address is selected
+  SPI.transfer(RDTMP); //temperatures to be read
+  byte tempr[5];
+  for(int i=0;i<5;i++) {
+    tempr[i] = SPI.transfer(RDTMP);
+  }
+  LT_SPI_END;
+  //convert temperature registers to temperatures
+  raw_temperatures[0] = (tempr[0] & 0xFF) | (tempr[1] & 0x0F) << 8;
+  raw_temperatures[1] = (tempr[1] & 0xF0) >> 4 | (tempr[2] & 0xFF) << 4;
+  raw_temperatures[2] = (tempr[3] & 0xFF) | (tempr[4] & 0x0F) << 8;
+  
+  // Convert raw_temperatures into floats
+  convertVoltTemp(raw_temperatures, temperatures);
+}
+
+// Sends out CAN packet
+void sendCAN(int id, char*data, int size) {
+  CanMessage msg = CanMessage();
+  msg.id = id;
+  msg.len = size;
+  for(int i=0;i<size;i++) {
+    msg.data[i] = data[i];
+  }
+  Can.send(msg);
+}
+
+void bpsSetup() {
+  char init[1] = { 0x00 };
+  sendCAN(0x041, init, 1);
+  pinMode(B0,OUTPUT);
+  
+  // Turn on fans
+  pinMode(FAN1,OUTPUT);
+  pinMode(FAN2,OUTPUT);
+  digitalWrite(FAN1,HIGH);
+  digitalWrite(FAN2,HIGH);
+  
+  // Turns on SPI
+  LT_SPI_END; 
+  SPI.begin();
+  SPI.setClockDivider(SPI_CLOCK_DIV64);
+  SPI.setDataMode(SPI_MODE3);
+  SPI.setBitOrder(MSBFIRST);
+}
+
+/*** Sends all cell voltages and temperatures.  Sends 1 module worth of
+ * data per call, alternates module on each call.
+ */
+void sendBpsData() {
+  // Set number of cells correctly.  Module 2 has 11 cells.
+  int length = 12;
+  if (can_current_module == 2) {
+    length = 11;
+  }
+  float* cell_voltages = battery_voltages[can_current_module];
+  float* module_temperatures = temperatures[can_current_module];
+  
+  // Iterate through all cells
+  for(int i=0; i<(length+3); i++) {
+    char data[4];
+    int id = (1 << 8) | (can_current_module << 4) | i;
+    if(i < length) {
+      if((can_current_module == 2) && (i > 8) && (i < 12)) {
+        continue;
+      } else {
+        data[0] = *((char*)&cell_voltages[i]);
+        data[1] = *((char*)&cell_voltages[i]+1);
+        data[2] = *((char*)&cell_voltages[i]+2);
+        data[3] = *((char*)&cell_voltages[i]+3);
+      }
+    } else {
+        data[0] = *((char*)&module_temperatures[i-length]);
+        data[1] = *((char*)&module_temperatures[i-length]+1);
+        data[2] = *((char*)&module_temperatures[i-length]+2);
+        data[3] = *((char*)&module_temperatures[i-length]+3);
+    }
+    sendCAN(id, data, 4);
+  }
+  
+  // Increment current working module, mod 3
+  can_current_module++;
+  if (can_current_module >= 3) {
+    can_current_module = 0;
+  }
+}
+
+/***
+ * Queries all LT boards and update internal state.  Raise flags if needed.
+ */
+void bpsUpdate() {
+  config[0] = 0xE5;
+  writeConfig(config);
+  
+  // Iterate through all 3 LT boards
+  for(int current_board=0; current_board < 3; current_board++) {
+    float* current_board_voltages = battery_voltages[current_board];
+    // Set number of cells to 12 for board 0 and 1, 11 for board 2
+    int total_cells = 12;
+    if(current_board == 2) {
+      total_cells = 11;
+    }
+    
+    // Write configuration into the board
+    byte rconfig[6];
+    readConfig(rconfig, board_address[current_board]);
+    if(rconfig[0]==0xFF || rconfig[0]==0x00 || rconfig[0]==0x02) {
+      Serial.print("Board not communicating: ");
+      Serial.println(current_board);
+      system_error = 1;
+      continue;
+    }
+
+    // Read cell voltages
+    beginCellVolt();
+    readCellVolt(current_board_voltages, board_address[current_board]);
+    
+    // Iterate through all cells and run checks. Toggle error flag if needed.
+    for (int current_cell = 0; current_cell < total_cells; current_cell++) {
+      const float cell_voltage = current_board_voltages[current_cell];
+      
+      // Over voltage checks
+      if (cell_voltage > OVERVOLTAGE_ERROR_LEVEL) {
+        overvolt_error = 1;
+      } else if (cell_voltage > OVERVOLTAGE_WARNING_LEVEL) {
+        overvolt_warning = 1;
+      }
+      
+      // Under voltage checks
+      if (cell_voltage < UNDERVOLTAGE_ERROR_LEVEL) {
+        undervolt_error = 1;
+      } else if (cell_voltage > UNDERVOLTAGE_WARNING_LEVEL) {
+        undervolt_warning = 1;
+      }
+    }
+
+    // Read temperatures
+    float temperatures[3];
+    readTemp(temperatures, board_address[current_board]);;
+    
+    // Iterate through sensors and check for over temperature
+    for (int current_sensor = 0; current_sensor < 3; current_sensor++) {
+      const float temperature = temperatures[current_sensor];
+      if (temperature > OVERTEMP_ERROR_LEVEL) {
+        overtemp_error = 1;
+      } else if (temperature > OVERTEMP_WARNING_LEVEL) {
+        overtemp_warning = 1;
+      }
+    }
+  }
+}
+
+#endif
