@@ -30,7 +30,8 @@ class WiflyData():
     """
     # If we have an empty buffer, return
     if not self.buf: return
-    packets = self.buf.split('\n')
+    # Packets are deliminated by commas
+    packets = self.buf.split(',')
     # If the very last item is not an empty string (representing a newline),
     # Leave it in the buffer
     if not packets[-1]:
@@ -42,22 +43,14 @@ class WiflyData():
     
     # Verify all packets, and store them
     for packet in packets:
-      if len(packet) < 4:
-        # Invalid packet, missing header
-        continue
-      can_id = packet[0:3]
+      can_id, dlc, data = packet.split('-')
+      dlc = int(dlc)
       can_id_hex = int(can_id, 16)
-      if can_id_hex > 0x7FF:
-        # Invalid CAN ID
-        continue
-      dlc = int(packet[3])
-      if dlc > 8:
-        # Invalid DLC
-        continue
-      data = packet[4:]
       if len(data) != (dlc * 2):
         # Data does not match DLC
+        print "Len does not match %d vs %d" % (len(data), (dlc * 2))
         continue
+      print "ID: 0x%X\tData: %s" % (can_id_hex, data)
       self.can_data['0x%X' % can_id_hex] = data
       
 
@@ -85,7 +78,7 @@ class WiflyServer(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.end_headers()
       if 'data' not in req:
         return  # Invalid request, fail gracefully
-      data.write(req['data'])
+      data.write(request['data'])
       data.process()
     elif req_path == '/get':
       # Request from client, send out wifly data as JSON object
@@ -110,13 +103,19 @@ class WiflyServer(SimpleHTTPServer.SimpleHTTPRequestHandler):
       except IOError:
         self.send_error(404, 'jquery.js not found')
     else:
-      # Unknown path
-      self.send_error(404, 'Reqeust not recognized')
+      try:
+        f = open(self.path[1:])
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(f.read())
+      except IOError:
+        self.send_error(404, 'File %s not found' % self.path[1:])
       
       
 if __name__ == '__main__':
   try:
-    server = SocketServer.TCPServer(('', 8000), WiflyServer)
+    server = SocketServer.TCPServer(('', 8001), WiflyServer)
     print 'Started WiFly server...'
     server.serve_forever()
   except KeyboardInterrupt:
