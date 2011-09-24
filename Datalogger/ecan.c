@@ -16,8 +16,6 @@
 #include "ecan.h"
 #include "hardware.h"
 
-#include "uart.h"
-#include "uartstring.h"
 /*
  * Variables
  */
@@ -383,75 +381,16 @@ uint8_t ECAN_TransmitBuffer(uint8_t buffer) {
 	if (buffer % 2 == 0) {
 		if ((*bufferCtrl & 0b10000000) != 0) {
 			*bufferCtrl = *bufferCtrl | 0b00001000;
+			return 1;
 		} else {
 			return -2;
 		}
 	} else {
 		if ((*bufferCtrl & 0b1000000000000000) != 0) {
 			*bufferCtrl = *bufferCtrl | 0b0000100000000000;
+			return 1;
 		} else {
 			return -2;
 		}
 	}
-}
-
-/*
- * Debug Functions
- */
-
-/**
- * Prints the specified buffer contents to the UART
- */
-void ECAN_PrintBuffer(uint8_t buffer) {
-	uint16_t sid;
-	uint32_t eid;
-	uint8_t dlc;
-	uint8_t data[8];
-	uint8_t i=0;
-
-	putsUART("Buffer ");
-	putuiUART(buffer);
-	putsUART(" (");
-
-	dlc = ECAN_ReadBuffer(buffer, &sid, &eid, 8, data);
-
-	if (dlc > 8) {
-		putsUART("out of bounds)");
-		newlineUART();
-		return;
-	}
-	if (buffer < 8) {
-		unsigned volatile int *bufferCtrl = &C1TR01CON + (buffer / 2);
-		if (buffer % 2 == 0) {
-			if ((*bufferCtrl & 0b10000000) != 0) {
-				putsUART("TX");
-			} else {
-				putsUART("RX");
-			}
-		} else {
-			if ((*bufferCtrl & 0b1000000000000000) != 0) {
-				putsUART("TX");
-			} else {
-				putsUART("RX");
-			}
-		}
-	} else {
-		putsUART("RX Only");
-	}
-	putsUART("): ");
-
-	putcolbUART(sid, 11);
-	if (eid != -1) {
-		putcUART(' ');
-		putcolbUART(eid, 18);
-	}
-
-	putsUART(", Payload (");
-	putuiUART(dlc);
-	putsUART("): ");
-	for (i=0;i<dlc;i++) {
-		putcolbUART(data[i], 8);
-		putcUART(' ');
-	}
-	newlineUART();
 }

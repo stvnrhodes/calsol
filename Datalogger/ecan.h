@@ -7,6 +7,10 @@
  * This file contains function prototypes and configuration definitions for the
  * on-board ECAN module
  */
+
+#ifndef ECAN_H
+#define ECAN_H
+
 #include "types.h"
 #include "hardware.h"
 
@@ -27,6 +31,7 @@
  */
 //#define ECAN_BITRATE 500000
 #define ECAN_BITRATE 1000000
+//#define ECAN_BITRATE 125000
 /**
  * Synchronization Jump Width, in Time Quanta (TQ).
  * Code will automatically generate (subtract 1) the register value.
@@ -147,4 +152,4 @@ int8_t ECAN_ReadBuffer(uint8_t buffer, uint16_t *sid, uint32_t *eid,
 	uint8_t dlc, uint8_t *data);
 uint8_t ECAN_TransmitBuffer(uint8_t buffer);
 
-void ECAN_PrintBuffer(uint8_t buffer);
+#endif
