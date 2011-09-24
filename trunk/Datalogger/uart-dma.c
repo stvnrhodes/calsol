@@ -26,9 +26,9 @@ volatile uint16_t UART_DMA_TransferringSize = 0;	/// Number of bytes currently b
  */
 void UART_DMA_Init() {
 	// Initialize UART
-	UART_UMODEbits.BRGH = UART_BRGH;
+	UART_UMODEbits.BRGH = UART_DMA_BRGH;
 	UART_UMODEbits.UARTEN = 1;
-	UART_UBRG = UART_BRG;
+	UART_UBRG = UART_DMA_BRG;
 	UART_USTAbits.UTXEN = 1;
 	UART_USTAbits.UTXISEL1 = 1;
 	UART_USTAbits.UTXISEL0 = 0;
@@ -56,7 +56,7 @@ void UART_DMA_Init() {
  * @return Number of bytes written to the UART DMA buffer.
  */
 uint16_t UART_DMA_WriteAtomicS(char* string) {
-	UART_DMA_WriteAtomic(string, strlen(string));
+	return UART_DMA_WriteAtomic(string, strlen(string));
 }
 
 /**
@@ -137,6 +137,40 @@ void UART_DMA_WriteBlockingS(char* string) {
 }
 
 /**
+ * Writes a string to the UART DMA buffer.
+ * This blocks until the entire string is entered into the buffer. Partial writes
+ * will NOT happen.
+ *
+ * @param data Null-terminated string to write to the UART DMA buffer.
+ * @param dataLen Number of bytes to write to the UART DMA buffer.
+ */
+void UART_DMA_WriteBlocking(char* string, uint16_t dataLen) {
+	uint16_t localBufEnd = UART_DMA_bufEnd;
+	uint16_t currBufEnd;
+
+	while (dataLen > 0) {
+		UART_DMA_Buffer[localBufEnd] = *string;
+
+		currBufEnd = localBufEnd;
+		localBufEnd++;
+		if (localBufEnd == UART_DMA_BUFFER_SIZE) {
+			localBufEnd = 0;
+		}
+
+		if (localBufEnd == UART_DMA_bufStart) {		// Full buffer
+			UART_DMA_bufEnd = currBufEnd;
+			while (localBufEnd == UART_DMA_bufStart){	// Wait for empty buffer location
+				UART_DMA_SendBlock();
+			}
+		}
+		string++;
+		dataLen--;
+	}
+	UART_DMA_bufEnd = localBufEnd;
+	UART_DMA_SendBlock();
+}
+
+/**
  * Sets the DMA module to transfer the next block of data.
  *
  * @return Number of bytes to be transferred.
@@ -161,15 +195,17 @@ uint16_t UART_DMA_SendBlock() {
 
 		UART_DMACONbits.CHEN = 1;
 		UART_DMAREQbits.FORCE = 1;
+
+		return UART_DMA_TransferringSize;
 	} else {
 		return 0;
 	}
 }
 
-void __attribute__((__interrupt__)) UART_DMAInterrupt(void) {
+void __attribute__((interrupt, no_auto_psv)) UART_DMAInterrupt(void) {
 	UART_DMAIF = 0;
 
-	// Atomically set the buffer starting position
+	// Set new buffer starting position
 	uint16_t localBufStart = UART_DMA_bufStart;
 	localBufStart += UART_DMA_TransferringSize;
 	if (localBufStart >= UART_DMA_BUFFER_SIZE) {
@@ -178,24 +214,20 @@ void __attribute__((__interrupt__)) UART_DMAInterrupt(void) {
 	UART_DMA_bufStart = localBufStart;
 	
 	// Check if there is more data
-	uint16_t localBufEnd = UART_DMA_bufEnd;		// Take a local copy to avoid parallelism bugs
-	if (UART_DMA_bufStart != localBufEnd) {
-		UART_DMASTA = __builtin_dmaoffset(UART_DMA_Buffer) + UART_DMA_bufStart;
+	uint16_t localBufEnd = UART_DMA_bufEnd;
+	if (localBufStart != localBufEnd) {
+		UART_DMASTA = __builtin_dmaoffset(UART_DMA_Buffer) + localBufStart;
 		// Calculate transfer size
-		if (localBufEnd < UART_DMA_bufStart) {	// Buffer wraps around, transfer to end
-			UART_DMA_TransferringSize = UART_DMA_BUFFER_SIZE - UART_DMA_bufStart;
+		if (localBufEnd < localBufStart) {	// Buffer wraps around, transfer to end
+			UART_DMA_TransferringSize = UART_DMA_BUFFER_SIZE - localBufStart;
 		} else {					// Buffer does not wrap, transfer all
-			UART_DMA_TransferringSize = localBufEnd - UART_DMA_bufStart;
+			UART_DMA_TransferringSize = localBufEnd - localBufStart;
 		}
 		// Upper bound the transfer size to keep the pipe full
 		if (UART_DMA_TransferringSize > UART_DMA_BUFFER_SIZE / 2) {
 			UART_DMA_TransferringSize = UART_DMA_BUFFER_SIZE / 2;
 		}
 		UART_DMACNT = UART_DMA_TransferringSize - 1;
-
-		if (UART_DMA_bufStart == 0) {
-			UART_DMA_Active = 2;
-		}
 
 		while (UART_USTAbits.UTXBF);
 
