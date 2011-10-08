@@ -77,5 +77,8 @@ void initPins() {
   digitalWrite(V1, HIGH);
   pinMode(V2, INPUT);
   digitalWrite(V2, HIGH);
+  
+  // BPS SPI
+  pinMode(LT_CS, OUTPUT);
 }
 #endif
