@@ -4,11 +4,13 @@
  * Author(s): Ryan Tseng, Stephen Chen
  * Date: Sept 25th 2011
  */
+ 
 #ifndef _BPS_H_
 #define _BPS_H_
 
 #include "SPI.h"  
 #include "pindef.h"
+#include "can_id.h"
 
 // Macros for beginning and ending LT SPI transmission
 #define LT_SPI_START digitalWrite(LT_CS,LOW)
@@ -16,7 +18,7 @@
 
 // Utility macros
 #define MAX(A, B) (A > B) ? A : B
-#define min(A, B) (A < B) ? A : B
+#define MIN(A, B) (A < B) ? A : B
 
 // Control Bytes 
 #define WRCFG 0x01   // Write config 
@@ -59,6 +61,14 @@ int system_error = 0;
 float battery_voltages[3][12];
 float temperatures[3][3];
 int can_current_module = 0;
+
+// Init SPI
+void initBps() {
+  SPI.begin();
+  SPI.setClockDivider(SPI_CLOCK_DIV64);
+  SPI.setDataMode(SPI_MODE3);
+  SPI.setBitOrder(MSBFIRST);
+}
 
 // Write config to the LT board's configuration
 void writeConfig(byte* config) {
@@ -200,6 +210,31 @@ void bpsSetup() {
   SPI.setDataMode(SPI_MODE3);
   SPI.setBitOrder(MSBFIRST);
 }
+void printBpsData() {
+  // Set number of cells correctly.  Module 2 has 11 cells.
+  int length = 12;
+  if (can_current_module == 2) {
+    length = 11;
+  }
+  float* cell_voltages = battery_voltages[can_current_module];
+  float* module_temperatures = temperatures[can_current_module];
+  Serial.print("Module ");
+  Serial.println(can_current_module);
+  
+  // Iterate through all cells
+  for(int i=0; i<length; i++) {
+    Serial.print("Cell index ");
+    Serial.print(i);
+    Serial.print(": ");
+    Serial.println(cell_voltages[i]);
+  }
+  
+  // Increment current working module, mod 3
+  can_current_module++;
+  if (can_current_module >= 3) {
+    can_current_module = 0;
+  }
+}
 
 /*** Sends all cell voltages and temperatures.  Sends 1 module worth of
  * data per call, alternates module on each call.
@@ -212,28 +247,27 @@ void sendBpsData() {
   }
   float* cell_voltages = battery_voltages[can_current_module];
   float* module_temperatures = temperatures[can_current_module];
+  int can_module_offset = CAN_BPS_BASE;
+  can_module_offset += can_current_module * CAN_BPS_MODULE_OFFSET;
   
-  // Iterate through all cells
-  for(int i=0; i<(length+3); i++) {
-    char data[4];
-    int id = (1 << 8) | (can_current_module << 4) | i;
-    if(i < length) {
-      if((can_current_module == 2) && (i > 8) && (i < 12)) {
-        continue;
-      } else {
-        data[0] = *((char*)&cell_voltages[i]);
-        data[1] = *((char*)&cell_voltages[i]+1);
-        data[2] = *((char*)&cell_voltages[i]+2);
-        data[3] = *((char*)&cell_voltages[i]+3);
-      }
-    } else {
-        data[0] = *((char*)&module_temperatures[i-length]);
-        data[1] = *((char*)&module_temperatures[i-length]+1);
-        data[2] = *((char*)&module_temperatures[i-length]+2);
-        data[3] = *((char*)&module_temperatures[i-length]+3);
-    }
-    sendCAN(id, data, 4);
+  // Iterate through all cells, send voltage measurements.
+  for(int cell_number = 0; cell_number < length; cell_number++) {
+    // Set up the correct ID w/ module and cell offsets.
+    int id = can_module_offset + cell_number;
+    two_floats voltage_data;
+    voltage_data.f[0] = cell_voltages[cell_number];
+    sendCAN(id, voltage_data.c, 4);
   }
+  
+  // Send temperature data
+  for(int temp_number; temp_number < 3; temp_number++) {
+    // Set up temperature can ID w/ module and sensor offsets.
+    int id = can_module_offset + CAN_BPS_TEMP_OFFSET + temp_number;
+    two_floats temperature_data;
+    temperature_data.f[0] = module_temperatures[temp_number];
+    sendCAN(id, temperature_data.c, 4);
+  }
+  
   
   // Increment current working module, mod 3
   can_current_module++;
@@ -255,7 +289,7 @@ void bpsUpdate() {
     // Set number of cells to 12 for board 0 and 1, 11 for board 2
     int total_cells = 12;
     if(current_board == 2) {
-      total_cells = 11;
+      total_cells = 10;
     }
     
     // Write configuration into the board
@@ -292,20 +326,12 @@ void bpsUpdate() {
     }
 
     // Read temperatures
-    float temperatures[3];
-    readTemp(temperatures, board_address[current_board]);;
+    float * current_temperatures = temperatures[current_board];
+    readTemp(current_temperatures, board_address[current_board]);
     
     // Iterate through sensors and check for over temperature
     for (int current_sensor = 0; current_sensor < 3; current_sensor++) {
-      const float temperature = temperatures[current_sensor];
-      #ifdef DEBUG_TEMP
-        Serial.print("Temp ");
-        Serial.print(current_board);
-        Serial.print(" ");
-        Serial.print(current_sensor);
-        Serial.print(" ");
-        Serial.println(temperature);
-      #endif
+      const float temperature = current_temperatures[current_sensor];
       if (temperature > OVERTEMP_ERROR_LEVEL) {
         overtemp_error = 1;
       } else if (temperature > OVERTEMP_WARNING_LEVEL) {
@@ -313,6 +339,20 @@ void bpsUpdate() {
       }
     }
   }
+  #ifdef BPS_DEBUG
+    Serial.print("OV: ");
+    Serial.print(overvolt_warning);
+    Serial.print(" ");
+    Serial.println(overvolt_error);
+    Serial.print("UV: ");
+    Serial.print(undervolt_warning);
+    Serial.print(" ");
+    Serial.println(overvolt_error);
+    Serial.print("OT: ");
+    Serial.print(overtemp_warning);
+    Serial.print(" ");
+    Serial.println(overtemp_error);
+  #endif
 }
 
 #endif

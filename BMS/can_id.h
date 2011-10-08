@@ -37,6 +37,6 @@
 #define CAN_BPS_BASE            0x100  // BPS signal base
 #define CAN_BPS_MODULE_OFFSET   0x010  // Difference between modules
 #define CAN_BPS_TEMP_OFFSET     0x00C  // Offset in addition to module offset
-#define CAN_BPS_DIE_TEMP_OFFSET 0x00C  // Offset for LT die temperature
+#define CAN_BPS_DIE_TEMP_OFFSET 0x00E  // Offset for LT die temperature
 
 #endif

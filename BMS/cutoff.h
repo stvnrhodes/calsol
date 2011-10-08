@@ -5,6 +5,9 @@
  * Date: Aug 3rd 2011
  */
 
+#define DEBUG
+#define DEBUG_STATES
+
 #ifndef _CUTOFF_HELPER_H_
 #define _CUTOFF_HELPER_H_ 
 
@@ -24,8 +27,8 @@ int numHeartbeats = 0;  // Number of bps heartbeats recieved
 char precharge_voltage_reached = 0;
 
 // Millisecond counter for sending heartbeats and data
-int last_send_cutoff_can = 0;
-int last_send_bps_can = 0;
+unsigned long last_send_cutoff_can = 0;
+unsigned long last_send_bps_can = 0;
 
 enum STATES {
   PRECHARGE,
@@ -247,20 +250,14 @@ void playSongs() {
 // Reads voltage from first voltage source (millivolts)
 long readV1() {
   long reading = analogRead(V1);
-  long voltage = reading * 5 * 1000 / 1023 ;  
-  // 2.7M+110K +470K/ 110K Because a fuse kept blowing We also added
-  // in another resistor to limit the current (470K).
-  voltage = voltage * (270+10.8) / 10.8; // 2.7M+110K / 110K   voltage divider
+  long voltage = reading * 1000000 / 3123;
   return voltage ;
 }
 
 // Reads voltage from second voltage source (milliVolts)
 long readV2() {
   long reading = analogRead(V2);
-  long voltage = reading * 5 *1000 / 1023 ;  
-  // 2.7M+110K +470K/ 110K Because a fuse kept blowing We also added
-  // in another resistor to limit the current (470K).
-  voltage = voltage * (270+10.8) / 10.8; // 2.7M+110K / 110K   voltage divider
+  long voltage = reading * 1000000 / 3123;
   return voltage; 
 }
 
@@ -441,7 +438,7 @@ void do_precharge() {
     /* Off switch engaged, Transition to off */
     state = TURNOFF; //actually redundant
     return;
-  } else if ((prechargeV < prechargeTarget)  || (voltageDiff>3) || 
+  } else if ((prechargeV < prechargeTarget)  || (voltageDiff>6) || 
              (millis()-startTime < 1000)) {
     //wait for precharge to bring motor voltage up to battery voltage  
     /* Precharge incomplete */
@@ -603,7 +600,7 @@ void do_error() {
     
     // Store the shutdown reason into EEPROM
     #ifdef DEBUG
-       Serial.print("\tBPS Code: ");
+       Serial.print("  BPS Code: ");
        Serial.print("OV: ");
        Serial.print(overvolt_error);
        Serial.print("UV: ");
