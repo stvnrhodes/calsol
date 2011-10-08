@@ -1,16 +1,26 @@
 /* CalSol - UC Berkeley Solar Vehicle Team 
  * dashboard.h - Dashboard Module
  * Purpose: Header file for the dashboard IO board.
- * Author(s): Ryan Tseng.
+ * Author(s): Ryan Tseng, Steven Rhodes.
  * Date: Oct 3rd 2011
  */
 
 /* User constants */
-#define ACCEL_THRESHOLD_LOW  100
-#define ACCEL_THRESHOLD_HIGH 1000
-#define BRAKE_THRESHOLD_LOW  40
-#define BRAKE_THRESHOLD_HIGH 1000
-#define LIGHT_BLINK_PERIOD   512
+#define ACCEL_THRESHOLD_LOW    100
+#define ACCEL_THRESHOLD_HIGH   850
+#define BRAKE_THRESHOLD_LOW    20
+#define BRAKE_THRESHOLD_HIGH   330
+#define LIGHT_BLINK_PERIOD     512
+#define CRUISE_SPEED_INCREMENT 0.1
+#define CRUISE_TORQUE_SETTING  0.8
+
+// Above this speed, the car will not change from FORWARD to NEUTRAL or REVERSE
+#define MAX_STATE_CHANGE_SPEED 5
+
+#define OFF   0
+#define ON    1
+#define FALSE 0
+#define TRUE  1
 
 /* State constants */
 enum states_enum {
@@ -25,26 +35,21 @@ float accel = 0.0;
 float brake = 0.0;
 float current_speed = 0.0;  // Measured speed.
 float set_speed = 0.0;      // Desired speed based on cruise control in m/s.
-char cruise_on = 0;         // Flag to set if cruise control is on or off.
+char cruise_on = OFF;         // Flag to set if cruise control is on or off.
+char regen_on = OFF;          // Flag to set if regen braking is enabled.
 
 // Blinker states
-enum blinker_state {
-  OFF = 0,
-  BLINKER_ON,
-  BLINKER_OFF
-};
-blinker_state hazard_state = OFF;
-blinker_state left_state   = OFF;
-blinker_state right_state  = OFF;
+char hazard_state = OFF;
+char left_state   = OFF;
+char right_state  = OFF;
 
 // Other 12V output states
-char brake_state  = 0;
-char horn_state   = 0;
-
+char brake_state  = OFF;
+char horn_state   = OFF;
 
 // Global timekeeping variables
 unsigned long last_sent_tritium = 0;
-unsigned long last_lights_blinked = 0;
+unsigned long last_auxiliary_cycle = 0;
 
 /* Helper functions */
 // 8 chars and 2 floats sharing the same space. Used for converting two floats
@@ -55,6 +60,47 @@ typedef union {
 } two_floats;
 
 /***
+ * Keep track of timing for blinking lights such as hazard lights and turn
+ * signal
+ */
+unsigned long _last_lights_blinked = 0;
+
+void resetBlinkingLightsTimer() {
+  _last_lights_blinked = millis();
+}
+
+char isBlinkingLightsOn() {
+  unsigned long current_time = millis();
+	// Check if the light timer has been on for a second or more
+	if (current_time - _last_lights_blinked > LIGHT_BLINK_PERIOD * 2 ||
+	    current_time < _last_lights_blinked) { // Edge case
+	  _last_lights_blinked = current_time;
+		return ON;
+	}
+	// Check if the light timer has been on for between half a second and a second
+  if (current_time - _last_lights_blinked > LIGHT_BLINK_PERIOD) {
+	  return OFF;
+	}
+	// The light is on if it's been less than half a second
+	return ON;
+}
+	
+/***
+ * Increments or decrements the speed of the cruise control based on the three
+ * way momentary switch position.  Each drive cycle will increase or decrease
+ * speed by a set.
+ */
+float adjustCruiseControl(float speed) {
+  if (!digitalRead(IN_CRUISE_ACC)) {
+	  speed += CRUISE_SPEED_INCREMENT;
+  } else if (!digitalRead(IN_CRUISE_DEC)) {
+	  speed -= CRUISE_SPEED_INCREMENT;
+	}
+	return speed;
+}
+
+
+	/***
  * Change light and horn state based on switches.
  */
 // TODO: Hazard latching
@@ -63,39 +109,19 @@ void updateAuxiliaryStates() {
     // Hazard lights
     if (!hazard_state) {
       // If this state is off...
-      hazard_state = BLINKER_ON;
+      hazard_state = ON;
       left_state = OFF;
       right_state = OFF;
-      last_lights_blinked = millis();
-    } else if (hazard_state == BLINKER_ON) {
-      if (millis() - last_lights_blinked > LIGHT_BLINK_PERIOD) {
-        last_lights_blinked = millis();
-        hazard_state = BLINKER_OFF;
-      }
-    } else if (hazard_state == BLINKER_OFF) {
-      if (millis() - last_lights_blinked > LIGHT_BLINK_PERIOD) {
-        last_lights_blinked = millis();
-        hazard_state = BLINKER_ON;
-      }
-    }
+      resetBlinkingLightsTimer();
+		}
   } else if (!digitalRead(IN_LTURN_SWITCH)) {
     // Left turn lights
     if (!left_state) {
       // If this state is off...
       hazard_state = OFF;
-      left_state = BLINKER_ON;
+      left_state = ON;
       right_state = OFF;
-      last_lights_blinked = millis();
-    } else if (left_state == BLINKER_ON) {
-      if (millis() - last_lights_blinked > LIGHT_BLINK_PERIOD) {
-        last_lights_blinked = millis();
-        left_state = BLINKER_OFF;
-      }
-    } else if (left_state == BLINKER_OFF) {
-      if (millis() - last_lights_blinked > LIGHT_BLINK_PERIOD) {
-        last_lights_blinked = millis();
-        left_state = BLINKER_ON;
-      }
+      resetBlinkingLightsTimer();
     }
   } else if (!digitalRead(IN_RTURN_SWITCH)) {
     // Right turn lights
@@ -103,21 +129,11 @@ void updateAuxiliaryStates() {
       // If this state is off...
       hazard_state = OFF;
       left_state = OFF;
-      right_state = BLINKER_ON;
-      last_lights_blinked = millis();
-    } else if (right_state == BLINKER_ON) {
-      if (millis() - last_lights_blinked > LIGHT_BLINK_PERIOD) {
-        last_lights_blinked = millis();
-        right_state = BLINKER_OFF;
-      }
-    } else if (right_state == BLINKER_OFF) {
-      if (millis() - last_lights_blinked > LIGHT_BLINK_PERIOD) {
-        last_lights_blinked = millis();
-        right_state = BLINKER_ON;
-      }
+      right_state = ON;
+      resetBlinkingLightsTimer();
     }
   } else {
-    // Nothin is on, lets turn all the lights off.
+    // Nothing is on, let's turn all the lights off.
     hazard_state = OFF;
     left_state   = OFF;
     right_state  = OFF;
@@ -129,30 +145,27 @@ void updateAuxiliaryStates() {
  */
 void auxiliaryControl() {
   // Turn blinkers on and off.
-  if (hazard_state) {
-    char light_state = hazard_state == BLINKER_ON;
-    digitalWrite(OUT_LTURN, light_state);
-    digitalWrite(OUT_RTURN, light_state);
-    digitalWrite(OUT_LTURN_INDICATOR, light_state);
-    digitalWrite(OUT_RTURN_INDICATOR, light_state);
-  } else if (left_state) {
-    char light_state = left_state == BLINKER_ON;
-    digitalWrite(OUT_LTURN, light_state);
-    digitalWrite(OUT_LTURN_INDICATOR, light_state);
-    digitalWrite(OUT_RTURN, LOW);
-    digitalWrite(OUT_RTURN_INDICATOR, LOW);
-  } else if (right_state) {
-    char light_state = right_state == BLINKER_ON;
-    digitalWrite(OUT_LTURN, LOW);
-    digitalWrite(OUT_LTURN_INDICATOR, LOW);
-    digitalWrite(OUT_RTURN, light_state);
-    digitalWrite(OUT_RTURN_INDICATOR, light_state);
+  if (hazard_state && isBlinkingLightsOn()) {
+    digitalWrite(OUT_LTURN, ON);
+    digitalWrite(OUT_RTURN, ON);
+    digitalWrite(OUT_LTURN_INDICATOR, ON);
+    digitalWrite(OUT_RTURN_INDICATOR, ON);
+  } else if (left_state && isBlinkingLightsOn()) {
+    digitalWrite(OUT_LTURN, ON);
+    digitalWrite(OUT_LTURN_INDICATOR, ON);
+    digitalWrite(OUT_RTURN, OFF);
+    digitalWrite(OUT_RTURN_INDICATOR, OFF);
+  } else if (right_state && isBlinkingLightsOn()) {
+    digitalWrite(OUT_LTURN, OFF);
+    digitalWrite(OUT_LTURN_INDICATOR, OFF);
+    digitalWrite(OUT_RTURN, ON);
+    digitalWrite(OUT_RTURN_INDICATOR, ON);
   } else {
     // Turn all lights off.
-    digitalWrite(OUT_LTURN, LOW);
-    digitalWrite(OUT_RTURN, LOW);
-    digitalWrite(OUT_LTURN_INDICATOR, LOW);
-    digitalWrite(OUT_RTURN_INDICATOR, LOW);
+    digitalWrite(OUT_LTURN, OFF);
+    digitalWrite(OUT_RTURN, OFF);
+    digitalWrite(OUT_LTURN_INDICATOR, OFF);
+    digitalWrite(OUT_RTURN_INDICATOR, OFF);
   }
   
   // Turn on brake lights if the brake pedal is stepped on.
@@ -180,6 +193,8 @@ void sendDriveCommand(float motor_velocity, float motor_current) {
  */
 // TODO: Cruise control
 void updateDrivingState() {
+  static char is_cruise_on = FALSE;
+
   // First, set switch_state to what the current switch is set at
   states_enum switch_state = NEUTRAL;
   if (digitalRead(IN_VEHICLE_FWD)) {
@@ -188,15 +203,26 @@ void updateDrivingState() {
     switch_state = REVERSE;
   }
   
-  if (switch_state != state && current_speed < 5) {
+	regen_on = digitalRead(IN_REGEN_SWITCH);
+	
+  if (switch_state != state && current_speed < MAX_STATE_CHANGE_SPEED) {
     // Only switch states if the car is going at less than 10 mph.
     state = switch_state;
   } else if (state == FORWARD && switch_state == state &&
-             !digitalRead(IN_CRUISE_ON)) {
+             !is_cruise_on &&!digitalRead(IN_CRUISE_ON)) {
     // Cruise is pressed, set cruise to whatever speed we are at.
     set_speed = current_speed;
-    cruise_on = 1;
-  }
+    cruise_on = ON;
+		digitalWrite(OUT_CRUISE_INDICATOR, ON);
+  } else if (cruise_on && digitalRead(IN_CRUISE_ON)) {
+	  // Cruise is not pressed, but cruise control is still on
+	  is_cruise_on = TRUE;
+	} else if (is_cruise_on && !digitalRead(IN_CRUISE_ON)) {
+	  // Cruise is pressed, so we want to turn it off
+	  is_cruise_on = FALSE;
+	  cruise_on = OFF;
+		digitalWrite(OUT_CRUISE_INDICATOR, OFF);
+	}
 }
 
 /***
@@ -209,26 +235,37 @@ void driverControl() {
   int accel_input_raw = analogRead(ANALOG_ACCEL_PEDAL);
   int brake_input_raw = analogRead(ANALOG_BRAKE_PEDAL);
   
+  // The raw brake value decreases as you press it, so we reverse it here
+  brake_input_raw = 1023 - brake_input_raw;
+  
   // Map values to 0.0 - 1.0 based on thresholds
   int constrained_accel = constrain(accel_input_raw, ACCEL_THRESHOLD_LOW,
                                     ACCEL_THRESHOLD_HIGH);
   int constrained_brake = constrain(brake_input_raw, BRAKE_THRESHOLD_LOW,
                                     BRAKE_THRESHOLD_HIGH);
-  accel = map(constrained_accel, ACCEL_THRESHOLD_LOW, 0, 
-              ACCEL_THRESHOLD_HIGH, 1000) / 1000.0;
-  brake = map(constrained_brake, BRAKE_THRESHOLD_LOW, 0, 
-              BRAKE_THRESHOLD_HIGH, 1000) / 1000.0;
+  accel = map(constrained_accel, ACCEL_THRESHOLD_LOW, 
+              ACCEL_THRESHOLD_HIGH, 0, 1000) / 1000.0;
+  brake = map(constrained_brake, BRAKE_THRESHOLD_LOW, 
+              BRAKE_THRESHOLD_HIGH, 0, 1000) / 1000.0;
 
   // Send CAN data based on current state.
   if (brake > 0.0) {
     // If the brakes are tapped, cut off acceleration
-    sendDriveCommand(0, brake);
-    cruise_on = 0;
+	  if (regen_on) {
+		  Serial.println("Regen on");
+      sendDriveCommand(0.0, brake);
+		} else {
+		  Serial.println("Regen off");
+		  sendDriveCommand(0.0, 0.0);
+		}
+    cruise_on = OFF;
+		digitalWrite(OUT_CRUISE_INDICATOR, OFF);
   } else {
     switch (state) {
       case FORWARD:
         if (cruise_on) {
-          sendDriveCommand(set_speed, 0.8);
+				  set_speed = adjustCruiseControl(set_speed);
+          sendDriveCommand(set_speed, CRUISE_TORQUE_SETTING);
         } else if (accel == 0.0) {
           sendDriveCommand(0.0, 0.0);
         } else {

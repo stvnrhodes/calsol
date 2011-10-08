@@ -29,8 +29,8 @@
 #define OUT_CRUISE_INDICATOR 15
 
 // Analog pedal in
-#define ANALOG_ACCEL_PEDAL 4
-#define ANALOG_BRAKE_PEDAL 3
+#define ANALOG_ACCEL_PEDAL 3
+#define ANALOG_BRAKE_PEDAL 4
 
 // Drive Switches
 #define IN_VEHICLE_FWD 19 
@@ -91,3 +91,22 @@ void initPins() {
 }
 #endif
 
+void testPins() {
+  Serial.print(IN_LTURN_SWITCH);
+	Serial.print(",");
+	Serial.print(IN_RTURN_SWITCH);
+	Serial.print(",");
+  Serial.print(IN_HAZ_SWITCH);
+	Serial.print(",");
+  Serial.print(IN_HORN_BUTTON);
+	Serial.print(",");
+  Serial.print(IN_VEHICLE_FWD);
+	Serial.print(",");
+  Serial.print(IN_VEHICLE_REV);
+	Serial.print(",");
+  Serial.print(IN_CRUISE_ON);
+	Serial.print(",");
+  Serial.print(IN_CRUISE_DEC);
+	Serial.print(",");
+  Serial.println(IN_CRUISE_ACC);
+}

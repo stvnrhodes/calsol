@@ -18,10 +18,13 @@ void setup() {
 }
 
 void loop() {
-  // Lights and horn control
-  updateAuxiliaryStates();
-  auxiliaryControl();
-  
+  // Lights and horn control. Called every 10 ms.
+  if (millis() - last_auxiliary_cycle > 10) {
+    last_auxiliary_cycle = millis();
+    updateAuxiliaryStates();
+    auxiliaryControl();
+  }
+	
   // Update speed values from Tritium
   // TODO: Write this code
   
@@ -30,5 +33,6 @@ void loop() {
     last_sent_tritium = millis();
     updateDrivingState();
     driverControl();
+		testPins();
   }
 }
