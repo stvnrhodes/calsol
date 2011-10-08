@@ -4,6 +4,7 @@
  * Author(s): Ryan Tseng. Jimmy Hack.  Brian Duffy.
  * Date: Sept 25th 2011
  */
+#define DEBUG
 
 #include <EEPROM.h>
 #include "pindef.h"
@@ -41,6 +42,7 @@ void setup() {
   /* General init */
   Serial.begin(115200);
   Serial.println("Powering Up");  
+  bpsSetup();
   initialize(); //initialize pins and variables to begin precharge state.  
   initCAN();
 }

@@ -4,7 +4,6 @@
  * Author(s): Ryan Tseng, Stephen Chen
  * Date: Sept 25th 2011
  */
- 
 #ifndef _BPS_H_
 #define _BPS_H_
 
@@ -287,7 +286,7 @@ void bpsUpdate() {
       // Under voltage checks
       if (cell_voltage < UNDERVOLTAGE_ERROR_LEVEL) {
         undervolt_error = 1;
-      } else if (cell_voltage > UNDERVOLTAGE_WARNING_LEVEL) {
+      } else if (cell_voltage < UNDERVOLTAGE_WARNING_LEVEL) {
         undervolt_warning = 1;
       }
     }
@@ -299,6 +298,14 @@ void bpsUpdate() {
     // Iterate through sensors and check for over temperature
     for (int current_sensor = 0; current_sensor < 3; current_sensor++) {
       const float temperature = temperatures[current_sensor];
+      #ifdef DEBUG_TEMP
+        Serial.print("Temp ");
+        Serial.print(current_board);
+        Serial.print(" ");
+        Serial.print(current_sensor);
+        Serial.print(" ");
+        Serial.println(temperature);
+      #endif
       if (temperature > OVERTEMP_ERROR_LEVEL) {
         overtemp_error = 1;
       } else if (temperature > OVERTEMP_WARNING_LEVEL) {
