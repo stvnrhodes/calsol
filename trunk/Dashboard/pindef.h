@@ -44,6 +44,9 @@
 #define OUT_CAMERA 2
 #define OUT_HORN 30
 
+// Status LED
+#define OUT_BRAIN_LED 15
+
 /*** 
  * Sets pin direction and initial state.
  ***/
@@ -93,20 +96,20 @@ void initPins() {
 
 void testPins() {
   Serial.print(IN_LTURN_SWITCH);
-	Serial.print(",");
-	Serial.print(IN_RTURN_SWITCH);
-	Serial.print(",");
+  Serial.print(",");
+  Serial.print(IN_RTURN_SWITCH);
+  Serial.print(",");
   Serial.print(IN_HAZ_SWITCH);
-	Serial.print(",");
+  Serial.print(",");
   Serial.print(IN_HORN_BUTTON);
-	Serial.print(",");
+  Serial.print(",");
   Serial.print(IN_VEHICLE_FWD);
-	Serial.print(",");
+  Serial.print(",");
   Serial.print(IN_VEHICLE_REV);
-	Serial.print(",");
+  Serial.print(",");
   Serial.print(IN_CRUISE_ON);
-	Serial.print(",");
+  Serial.print(",");
   Serial.print(IN_CRUISE_DEC);
-	Serial.print(",");
+  Serial.print(",");
   Serial.println(IN_CRUISE_ACC);
 }

@@ -30,10 +30,18 @@ enum states_enum {
   ERROR
 } state;
 
+// Health status
+enum status_enum {
+  OKAY_STATUS,
+  ERROR_STATUS
+} status;
+
 /* Global variables */
 float accel = 0.0;
 float brake = 0.0;
-float current_speed = 0.0;  // Measured speed.
+volatile float current_speed = 0.0;  // Measured speed.
+// Last time we received a speed packet.
+volatile unsigned long last_updated_speed = 0;  
 float set_speed = 0.0;      // Desired speed based on cruise control in m/s.
 char cruise_on = OFF;         // Flag to set if cruise control is on or off.
 char regen_on = OFF;          // Flag to set if regen braking is enabled.
@@ -50,6 +58,7 @@ char horn_state   = OFF;
 // Global timekeeping variables
 unsigned long last_sent_tritium = 0;
 unsigned long last_auxiliary_cycle = 0;
+unsigned long last_status_blink = 0;
 
 /* Helper functions */
 // 8 chars and 2 floats sharing the same space. Used for converting two floats
@@ -58,6 +67,16 @@ typedef union {
   char  c[8];
   float f[2];
 } two_floats;
+
+/***
+ * ISR for reading Tritium speed readings off CAN
+ */
+void processCan(CanMessage &msg) {
+  if (msg.id == CAN_TRITIUM_VELOCITY) {
+    last_updated_speed = millis();
+    current_speed = ((two_floats*)msg.data)->f[1];
+  }
+}
 
 /***
  * Keep track of timing for blinking lights such as hazard lights and turn
@@ -71,20 +90,20 @@ void resetBlinkingLightsTimer() {
 
 char isBlinkingLightsOn() {
   unsigned long current_time = millis();
-	// Check if the light timer has been on for a second or more
-	if (current_time - _last_lights_blinked > LIGHT_BLINK_PERIOD * 2 ||
-	    current_time < _last_lights_blinked) { // Edge case
-	  _last_lights_blinked = current_time;
-		return ON;
-	}
-	// Check if the light timer has been on for between half a second and a second
+  // Check if the light timer has been on for a second or more
+  if (current_time - _last_lights_blinked > LIGHT_BLINK_PERIOD * 2 ||
+      current_time < _last_lights_blinked) { // Edge case
+    _last_lights_blinked = current_time;
+    return ON;
+  }
+  // Check if the light timer has been on for between half a second and a second
   if (current_time - _last_lights_blinked > LIGHT_BLINK_PERIOD) {
-	  return OFF;
-	}
-	// The light is on if it's been less than half a second
-	return ON;
+    return OFF;
+  }
+  // The light is on if it's been less than half a second
+  return ON;
 }
-	
+  
 /***
  * Increments or decrements the speed of the cruise control based on the three
  * way momentary switch position.  Each drive cycle will increase or decrease
@@ -92,15 +111,15 @@ char isBlinkingLightsOn() {
  */
 float adjustCruiseControl(float speed) {
   if (!digitalRead(IN_CRUISE_ACC)) {
-	  speed += CRUISE_SPEED_INCREMENT;
+    speed += CRUISE_SPEED_INCREMENT;
   } else if (!digitalRead(IN_CRUISE_DEC)) {
-	  speed -= CRUISE_SPEED_INCREMENT;
-	}
-	return speed;
+    speed -= CRUISE_SPEED_INCREMENT;
+  }
+  return speed;
 }
 
 
-	/***
+/***
  * Change light and horn state based on switches.
  */
 // TODO: Hazard latching
@@ -110,17 +129,17 @@ void updateAuxiliaryStates() {
     if (!hazard_state) {
       // If this state is off...
       hazard_state = ON;
-      left_state = OFF;
-      right_state = OFF;
+      left_state   = OFF;
+      right_state  = OFF;
       resetBlinkingLightsTimer();
-		}
+    }
   } else if (!digitalRead(IN_LTURN_SWITCH)) {
     // Left turn lights
     if (!left_state) {
       // If this state is off...
       hazard_state = OFF;
-      left_state = ON;
-      right_state = OFF;
+      left_state   = ON;
+      right_state  = OFF;
       resetBlinkingLightsTimer();
     }
   } else if (!digitalRead(IN_RTURN_SWITCH)) {
@@ -128,8 +147,8 @@ void updateAuxiliaryStates() {
     if (!right_state) {
       // If this state is off...
       hazard_state = OFF;
-      left_state = OFF;
-      right_state = ON;
+      left_state   = OFF;
+      right_state  = ON;
       resetBlinkingLightsTimer();
     }
   } else {
@@ -203,8 +222,8 @@ void updateDrivingState() {
     switch_state = REVERSE;
   }
   
-	regen_on = digitalRead(IN_REGEN_SWITCH);
-	
+  regen_on = digitalRead(IN_REGEN_SWITCH);
+  
   if (switch_state != state && current_speed < MAX_STATE_CHANGE_SPEED) {
     // Only switch states if the car is going at less than 10 mph.
     state = switch_state;
@@ -213,16 +232,16 @@ void updateDrivingState() {
     // Cruise is pressed, set cruise to whatever speed we are at.
     set_speed = current_speed;
     cruise_on = ON;
-		digitalWrite(OUT_CRUISE_INDICATOR, ON);
+    digitalWrite(OUT_CRUISE_INDICATOR, ON);
   } else if (cruise_on && digitalRead(IN_CRUISE_ON)) {
-	  // Cruise is not pressed, but cruise control is still on
-	  is_cruise_on = TRUE;
-	} else if (is_cruise_on && !digitalRead(IN_CRUISE_ON)) {
-	  // Cruise is pressed, so we want to turn it off
-	  is_cruise_on = FALSE;
-	  cruise_on = OFF;
-		digitalWrite(OUT_CRUISE_INDICATOR, OFF);
-	}
+    // Cruise is not pressed, but cruise control is still on
+    is_cruise_on = TRUE;
+  } else if (is_cruise_on && !digitalRead(IN_CRUISE_ON)) {
+    // Cruise is pressed, so we want to turn it off
+    is_cruise_on = FALSE;
+    cruise_on = OFF;
+    digitalWrite(OUT_CRUISE_INDICATOR, OFF);
+  }
 }
 
 /***
@@ -251,20 +270,20 @@ void driverControl() {
   // Send CAN data based on current state.
   if (brake > 0.0) {
     // If the brakes are tapped, cut off acceleration
-	  if (regen_on) {
-		  Serial.println("Regen on");
+    if (regen_on) {
+      Serial.println("Regen on");
       sendDriveCommand(0.0, brake);
-		} else {
-		  Serial.println("Regen off");
-		  sendDriveCommand(0.0, 0.0);
-		}
+    } else {
+      Serial.println("Regen off");
+      sendDriveCommand(0.0, 0.0);
+    }
     cruise_on = OFF;
-		digitalWrite(OUT_CRUISE_INDICATOR, OFF);
+    digitalWrite(OUT_CRUISE_INDICATOR, OFF);
   } else {
     switch (state) {
       case FORWARD:
         if (cruise_on) {
-				  set_speed = adjustCruiseControl(set_speed);
+          set_speed = adjustCruiseControl(set_speed);
           sendDriveCommand(set_speed, CRUISE_TORQUE_SETTING);
         } else if (accel == 0.0) {
           sendDriveCommand(0.0, 0.0);

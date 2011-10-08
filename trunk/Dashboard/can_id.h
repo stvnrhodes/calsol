@@ -39,8 +39,24 @@
 #define CAN_BPS_TEMP_OFFSET     0x00C  // Offset in addition to module offset
 #define CAN_BPS_DIE_TEMP_OFFSET 0x00C  // Offset for LT die temperature
 
-// Tritium signals
+// To Tritium signals
 #define CAN_TRITIUM_DRIVE       0x501
 
+// From Tritium signals
+#define CAN_TRITIUM_ID          0x400
+#define CAN_TRITIUM_STATUS      0x401
+#define CAN_TRITIUM_BUS         0x402
+#define CAN_TRITIUM_VELOCITY    0x403
+#define CAN_TRITIUM_PHASE_CURR  0x404
+#define CAN_TRITIUM_MOTOR_VOLT  0x405
+#define CAN_TRITIUM_MOTOR_CURR  0x406
+#define CAN_TRITIUM_MOTOR_BEMF  0x407
+#define CAN_TRITIUM_15V_RAIL    0x408
+#define CAN_TRITIUM_LV_RAIL     0x409
+#define CAN_TRITIUM_FAN_SPEED   0x40A
+#define CAN_TRITIUM_MOTOR_TEMP  0x40B
+#define CAN_TRITIUM_AIR_TEMP    0x40C
+#define CAN_TRITIUM_CAP_TEMP    0x40D
+#define CAN_TRITIUM_ODOMETER    0x40E
 
 #endif
