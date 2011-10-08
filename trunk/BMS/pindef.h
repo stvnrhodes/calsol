@@ -41,6 +41,12 @@
 // BPS
 #define LT_CS         11
 
+// This is used to convert floats to char arrays.
+typedef union {
+  char c[8];
+  float f[2];
+} two_floats;
+
 /*** 
  * Sets pin direction and initial state.
  ***/
@@ -80,5 +86,12 @@ void initPins() {
   
   // BPS SPI
   pinMode(LT_CS, OUTPUT);
+  digitalWrite(LT_CS, HIGH);
+  
+  // Fans
+  pinMode(FAN1, OUTPUT);
+  digitalWrite(FAN1, HIGH);
+  pinMode(FAN2, OUTPUT);
+  digitalWrite(FAN2, HIGH);
 }
 #endif

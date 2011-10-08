@@ -4,7 +4,8 @@
  * Author(s): Ryan Tseng. Jimmy Hack.  Brian Duffy.
  * Date: Sept 25th 2011
  */
-#define DEBUG
+
+#define DEBUG_TEMP
 
 #include <EEPROM.h>
 #include "pindef.h"
@@ -42,7 +43,7 @@ void setup() {
   /* General init */
   Serial.begin(115200);
   Serial.println("Powering Up");  
-  bpsSetup();
+  initBps();
   initialize(); //initialize pins and variables to begin precharge state.  
   initCAN();
 }
@@ -94,11 +95,23 @@ void loop() {
   // Send CAN data once per second.  These should be off by 500 ms.
   if (millis() - last_send_cutoff_can > 1000) {
     last_send_cutoff_can = millis();
-    sendCutoffCAN();  
+    sendCutoffCAN();
+    #ifdef DEBUG_TEMP
+      for (int i = 0; i < 3; i++) {
+        Serial.print("Temp Board ");
+        Serial.print(i);
+        for (int j = 0; j < 3; j++) {
+          Serial.print(" ");
+          Serial.print(temperatures[i][j]);
+        }
+        Serial.println();
+      }
+    #endif
   }
   if (millis() - last_send_bps_can > 1000) {
     last_send_bps_can = millis();
     sendBpsData();
+    // printBpsData();
   }
   
   // Accept serial inputs
