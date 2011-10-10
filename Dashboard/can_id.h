@@ -41,6 +41,7 @@
 
 // To Tritium signals
 #define CAN_TRITIUM_DRIVE       0x501
+#define CAN_TRITIUM_RESET       0x503
 
 // From Tritium signals
 #define CAN_TRITIUM_ID          0x400

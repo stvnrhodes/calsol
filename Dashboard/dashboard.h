@@ -14,8 +14,15 @@
 #define CRUISE_SPEED_INCREMENT 0.1
 #define CRUISE_TORQUE_SETTING  0.8
 
+// The length of time to flash for the error LEDs
+#define SHORT_FLASH_TIME  80
+#define MIDDLE_FLASH_TIME 200
+#define LONG_FLASH_TIME   1000
+
 // Above this speed, the car will not change from FORWARD to NEUTRAL or REVERSE
-#define MAX_STATE_CHANGE_SPEED 5
+#define MAX_STATE_CHANGE_SPEED 2
+// This speed is the minimum speed needed to enable cruise control
+#define MIN_CRUISE_CONTROL_SPEED 2
 
 #define OFF   0
 #define ON    1
@@ -33,7 +40,8 @@ enum states_enum {
 // Health status
 enum status_enum {
   OKAY_STATUS,
-  ERROR_STATUS
+  ERROR_STATUS,
+  CAN_ERROR_STATUS
 } status;
 
 /* Global variables */
@@ -45,6 +53,12 @@ volatile unsigned long last_updated_speed = 0;
 float set_speed = 0.0;      // Desired speed based on cruise control in m/s.
 char cruise_on = OFF;         // Flag to set if cruise control is on or off.
 char regen_on = OFF;          // Flag to set if regen braking is enabled.
+volatile char tritium_reset = 0;       // Number of times to reset the tritium.
+// This is used to scale down our max output if an OC error occurs
+float overcurrent_scale = 1.0;
+volatile unsigned int tritium_limit_flags = 0x00;  // Status of the tritium from CAN
+volatile unsigned int tritium_error_flags = 0x00;  // Errors from tritium from CAN
+
 
 // Blinker states
 char hazard_state = OFF;
@@ -59,6 +73,11 @@ char horn_state   = OFF;
 unsigned long last_sent_tritium = 0;
 unsigned long last_auxiliary_cycle = 0;
 unsigned long last_status_blink = 0;
+// Time since the last Overcurrent Error, in millis()
+volatile unsigned long time_of_last_oc = 0;
+
+// Global debug
+volatile unsigned long num_can = 0;
 
 /* Helper functions */
 // 8 chars and 2 floats sharing the same space. Used for converting two floats
@@ -72,9 +91,17 @@ typedef union {
  * ISR for reading Tritium speed readings off CAN
  */
 void processCan(CanMessage &msg) {
+  num_can++;
   if (msg.id == CAN_TRITIUM_VELOCITY) {
     last_updated_speed = millis();
     current_speed = ((two_floats*)msg.data)->f[1];
+  } else if (msg.id == CAN_TRITIUM_STATUS) {
+    tritium_limit_flags = *((unsigned int*)&msg.data[0]);
+    tritium_error_flags = *((unsigned int*)&msg.data[2]);
+    if (msg.data[2] & 0x02) {
+      // We have an overcurrent error from the Tritium, better raise a flag.
+      tritium_reset = 2;
+    }
   }
 }
 
@@ -114,6 +141,9 @@ float adjustCruiseControl(float speed) {
     speed += CRUISE_SPEED_INCREMENT;
   } else if (!digitalRead(IN_CRUISE_DEC)) {
     speed -= CRUISE_SPEED_INCREMENT;
+  }
+  if (speed < 0) {
+    speed = 0;
   }
   return speed;
 }
@@ -195,6 +225,38 @@ void auxiliaryControl() {
 }
 
 /***
+ * Blinks the BRAIN debug LED to indicate any status errors.
+ * If okay, blink at 1Hz
+ * If general error, blink at 5Hz
+ * If CAN error, blink at 15Hz
+ */
+void blinkStatusLED() {
+  if (Can.rxError() > 50) {
+    status = CAN_ERROR_STATUS;
+  } else if (millis() - last_updated_speed > 1200) {
+    status = ERROR_STATUS;
+  } else {
+    status = OKAY_STATUS;
+  }
+  if (status == OKAY_STATUS) {
+    if (millis() - last_status_blink > LONG_FLASH_TIME) {
+      last_status_blink = millis();
+      digitalWrite(OUT_BRAIN_LED, !digitalRead(OUT_BRAIN_LED));
+    }
+  } else if (status == CAN_ERROR_STATUS) {
+    if (millis() - last_status_blink > SHORT_FLASH_TIME) {
+      last_status_blink = millis();
+      digitalWrite(OUT_BRAIN_LED, !digitalRead(OUT_BRAIN_LED));
+    }
+  } else {
+    if (millis() - last_status_blink > MIDDLE_FLASH_TIME) {
+      last_status_blink = millis();
+      digitalWrite(OUT_BRAIN_LED, !digitalRead(OUT_BRAIN_LED));
+    }
+  }
+}
+
+/***
  * Sends a drive command packet to the Tritium motor controller.  Velocity is
  * in meters per second, and current is a float between 0.0 and 1.0.
  */
@@ -207,38 +269,62 @@ void sendDriveCommand(float motor_velocity, float motor_current) {
 }
 
 /***
+ * Sends a reset packet to the Tritium.  This is called whenever there is an
+ * overcurrent error.
+ */
+void resetTritium() {
+  char data[8];
+  Can.send(CanMessage(CAN_TRITIUM_RESET, data, 8));
+  Serial.print("Sending Reset. Limit: ");
+  Serial.print(tritium_limit_flags, HEX);
+  Serial.print(" Error: ");
+  Serial.println(tritium_error_flags, HEX);
+  if (overcurrent_scale > 0.6 && millis() - time_of_last_oc > 50) {
+   overcurrent_scale -= 0.02;
+  }
+  time_of_last_oc = millis();
+}
+
+/***
  * Updates the current state of the car (Forward, Reverse, Neutral) based on
  * switches.
  */
 // TODO: Cruise control
 void updateDrivingState() {
-  static char is_cruise_on = FALSE;
 
   // First, set switch_state to what the current switch is set at
   states_enum switch_state = NEUTRAL;
-  if (digitalRead(IN_VEHICLE_FWD)) {
+  if (!digitalRead(IN_VEHICLE_FWD)) {
     switch_state = FORWARD;
-  } else if (digitalRead(IN_VEHICLE_REV)) {
+  } else if (!digitalRead(IN_VEHICLE_REV)) {
     switch_state = REVERSE;
   }
   
-  regen_on = digitalRead(IN_REGEN_SWITCH);
+  regen_on = !digitalRead(IN_REGEN_SWITCH);
   
   if (switch_state != state && current_speed < MAX_STATE_CHANGE_SPEED) {
     // Only switch states if the car is going at less than 10 mph.
     state = switch_state;
-  } else if (state == FORWARD && switch_state == state &&
-             !is_cruise_on &&!digitalRead(IN_CRUISE_ON)) {
-    // Cruise is pressed, set cruise to whatever speed we are at.
-    set_speed = current_speed;
-    cruise_on = ON;
-    digitalWrite(OUT_CRUISE_INDICATOR, ON);
-  } else if (cruise_on && digitalRead(IN_CRUISE_ON)) {
-    // Cruise is not pressed, but cruise control is still on
-    is_cruise_on = TRUE;
-  } else if (is_cruise_on && !digitalRead(IN_CRUISE_ON)) {
-    // Cruise is pressed, so we want to turn it off
-    is_cruise_on = FALSE;
+  }
+}
+
+/***
+ * Updates whether or not the car is in cruise control.
+ */
+void updateCruiseState() {
+  if (current_speed > MIN_CRUISE_CONTROL_SPEED && state == FORWARD) {
+    if (!digitalRead(IN_CRUISE_DEC)) {
+      // Cruise is pressed, set cruise to whatever speed we are at.
+      set_speed = current_speed;
+      cruise_on = ON;
+      digitalWrite(OUT_CRUISE_INDICATOR, ON);
+    } else if (set_speed != 0.0 && !digitalRead(IN_CRUISE_ACC)) {
+      // Resume old cruise speed 
+      cruise_on = ON;
+      digitalWrite(OUT_CRUISE_INDICATOR, ON);
+    }
+  } else if (!digitalRead(IN_CRUISE_ON)) {
+    // Cruise is on, so we want to turn it off
     cruise_on = OFF;
     digitalWrite(OUT_CRUISE_INDICATOR, OFF);
   }
@@ -266,15 +352,16 @@ void driverControl() {
               ACCEL_THRESHOLD_HIGH, 0, 1000) / 1000.0;
   brake = map(constrained_brake, BRAKE_THRESHOLD_LOW, 
               BRAKE_THRESHOLD_HIGH, 0, 1000) / 1000.0;
-
+              
+  // In case we get overcurrent errors, reduce the power we send.
+  accel *= overcurrent_scale;
+  brake *= overcurrent_scale;
   // Send CAN data based on current state.
   if (brake > 0.0) {
     // If the brakes are tapped, cut off acceleration
     if (regen_on) {
-      Serial.println("Regen on");
       sendDriveCommand(0.0, brake);
     } else {
-      Serial.println("Regen off");
       sendDriveCommand(0.0, 0.0);
     }
     cruise_on = OFF;
@@ -284,8 +371,12 @@ void driverControl() {
       case FORWARD:
         if (cruise_on) {
           set_speed = adjustCruiseControl(set_speed);
-          sendDriveCommand(set_speed, CRUISE_TORQUE_SETTING);
-        } else if (accel == 0.0) {
+          // Pressing the accelerator during cruise increases speed
+          float cruise_accel = map(accel, 0, 1, set_speed, 100);
+          float cruise_accel_torque = map(accel, 0, 1, CRUISE_TORQUE_SETTING, 1);
+          sendDriveCommand(cruise_accel, cruise_accel_torque);
+        } else if (accel < 0.01) {
+          // Accelerator is not pressed
           sendDriveCommand(0.0, 0.0);
         } else {
           sendDriveCommand(100.0, accel);
