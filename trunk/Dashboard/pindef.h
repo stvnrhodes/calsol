@@ -24,8 +24,8 @@
 
 // Cruise control inputs and outputs
 #define IN_CRUISE_ON 16
-#define IN_CRUISE_DEC 25
-#define IN_CRUISE_ACC 26
+#define IN_CRUISE_DEC 26
+#define IN_CRUISE_ACC 25
 #define OUT_CRUISE_INDICATOR 15
 
 // Analog pedal in
@@ -33,8 +33,8 @@
 #define ANALOG_BRAKE_PEDAL 4
 
 // Drive Switches
-#define IN_VEHICLE_FWD 19 
-#define IN_VEHICLE_REV 21
+#define IN_VEHICLE_FWD 21 
+#define IN_VEHICLE_REV 19
 #define IN_REGEN_SWITCH 20
 
 // 12V Switched Outputs
@@ -77,8 +77,10 @@ void initPins() {
   // Driver controls
   pinMode(IN_VEHICLE_FWD, INPUT);
   pinMode(IN_VEHICLE_REV, INPUT);
+  pinMode(IN_REGEN_SWITCH, INPUT);
   digitalWrite(IN_VEHICLE_REV, HIGH);
   digitalWrite(IN_VEHICLE_FWD, HIGH);
+  digitalWrite(IN_REGEN_SWITCH, HIGH);
   
   // 12V output
   pinMode(OUT_LTURN, OUTPUT);
@@ -95,21 +97,23 @@ void initPins() {
 #endif
 
 void testPins() {
-  Serial.print(IN_LTURN_SWITCH);
+  Serial.print(digitalRead(IN_LTURN_SWITCH));
   Serial.print(",");
-  Serial.print(IN_RTURN_SWITCH);
+  Serial.print(digitalRead(IN_RTURN_SWITCH));
   Serial.print(",");
-  Serial.print(IN_HAZ_SWITCH);
+  Serial.print(digitalRead(IN_HAZ_SWITCH));
   Serial.print(",");
-  Serial.print(IN_HORN_BUTTON);
+  Serial.print(digitalRead(IN_HORN_BUTTON));
   Serial.print(",");
-  Serial.print(IN_VEHICLE_FWD);
+  Serial.print(digitalRead(IN_VEHICLE_FWD));
   Serial.print(",");
-  Serial.print(IN_VEHICLE_REV);
+  Serial.print(digitalRead(IN_VEHICLE_REV));
   Serial.print(",");
-  Serial.print(IN_CRUISE_ON);
+  Serial.print(digitalRead(IN_REGEN_SWITCH));
   Serial.print(",");
-  Serial.print(IN_CRUISE_DEC);
+  Serial.print(digitalRead(IN_CRUISE_ON));
   Serial.print(",");
-  Serial.println(IN_CRUISE_ACC);
+  Serial.print(digitalRead(IN_CRUISE_DEC));
+  Serial.print(",");
+  Serial.println(digitalRead(IN_CRUISE_ACC));
 }
