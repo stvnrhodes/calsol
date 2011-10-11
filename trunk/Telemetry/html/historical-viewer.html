@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Historical Viewer</title>
+        <script type="text/javascript" src="/js/jquery-1.6.4.js"></script>
+        <script type="text/javascript" src="/js/dygraph-combined.js"></script>
+        <script type="text/javascript">
+            g = null;
+            rows = [];
+            tmax = new Date("1970/01/01");
+            options = {
+                width: 955,
+                height: 500,
+                connectSeparatedPoints: true
+            };
+
+            function encodeDate(date) {
+                var iso = "";
+                iso += date.getUTCFullYear();
+                if (date.getUTCMonth() < 9) //months are stored from 0-11
+                    iso += '0';
+                iso += (date.getUTCMonth() + 1);
+                if (date.getUTCDate() < 10)
+                    iso += '0';
+                iso += date.getUTCDate();
+                if (date.getUTCHours() < 10)
+                    iso += '0';
+                iso += date.getUTCHours();
+                if (date.getUTCMinutes() < 10)
+                    iso += '0';
+                iso += date.getUTCMinutes();
+                if (date.getUTCSeconds() < 10)
+                    iso += '0';
+                iso += date.getUTCSeconds();
+                return iso;
+            }
+            
+            function encodeTimestamp(s) {
+                if (!s)
+                    return "";
+                if (s.charAt(0) == '-') {
+                    return s;
+                } else {
+                    var date = new Date(s);
+                    if (isNaN(date.getTime())) {
+                        return null;
+                    } else {
+                        return encodeDate(date);
+                    }
+                }
+            }
+
+            function notifySending() {
+                $("#message").html("Loading data...");
+                $("#error").html("");
+            }
+
+            function notifyError(jqXHR, textStatus, errorThrown) {
+                $("#error").html("A " + textStatus + " error occurred in the AJAX request:<br/>"
+                                 + "<pre>" + errorThrown + "</pre>");
+            }
+
+            function updatePlot(data, textStatus, jqXHR) {
+                $("#error").html("");
+
+                if (data["data"].length == 0) {
+                    $("#message").html("Received response, but there's no data in that timespan");
+                    return;
+                } else {
+                    $("#message").html("Data received");
+                }
+                rows = data["data"];
+                tmax = new Date(data["tmax"]+"Z");
+
+                //rows[0][0] = new Date(rows[0][0]);
+                for (var i=0; i < rows.length; i++) {
+                    rows[i][0] = new Date(rows[i][0]+"Z");
+                }
+                options["labels"] = ["time"] + this;
+                options["file"] = rows;
+                
+                if (g == null) {
+                    g = new Dygraph(document.getElementById("graphdiv"),
+                                    rows, options);
+                } else {
+                    g.updateOptions(options);
+                }
+            }
+            
+            function requestUpdate() {
+                var errors = [];
+                
+                //Find all of the selected series
+                var selected = $("#series option:selected");
+                var messages = [];
+                var labels = [];
+                selected.each(function() {
+                    labels.push($(this).text());
+                    messages.push($(this).val());
+                });
+
+                if (messages.length == 0) {
+                    errors.push("You didn't select any data to plot");
+                }
+                
+                //Find the start/end bounds
+                var start = $("#start_field").val();
+                var end = $("#end_field").val();
+                var startTS = encodeTimestamp(start);
+                var endTS = encodeTimestamp(end);
+                
+                //If the timestamps are formatted incorrectly, let the user know
+                if (startTS == null) {
+                    errors.push("Start timestamp " + start + " is invalid");
+                }
+                if (endTS == null) {
+                    errors.push("End timestamp " + end + " is invalid");
+                }
+
+                if (startTS == "" && endTS == "") {
+                    errors.push("Can't plot an unbounded timespan");
+                }
+
+                if (errors.length > 0) {
+                    var errHTML = "";
+                    for (var i=0; i < errors.length; i++) {
+                        errHTML += "<li>" + errors[i] + "</li>";
+                    }
+                    $("#error").html("<ul>" + errHTML + "</ul>");
+                    return;
+                }
+
+                //Everything looks okay, let's make the request
+                var data_ = [];
+                for (var i=0; i < messages.length; i++) {
+                    data_.push({name:"m", value:messages[i]});
+                }
+                data_.push({name:"ts", value:startTS + "_" + endTS});
+                
+                $.ajax({
+                    url: "http://localhost:8000/data/history",
+                    dataType:   "json",
+                    context:    labels,
+                    beforeSend: notifySending,
+                    error:      notifyError,
+                    success:    updatePlot,
+                    data: data_
+                });
+            }
+
+            function poll() {
+                //Find all of the selected series
+                var selected = $("#series option:selected");
+                var messages = [];
+                var labels = [];
+                selected.each(function() {
+                    labels.push($(this).text());
+                    messages.push($(this).val());
+                });
+                if (messages.length == 0)
+                    return;
+
+                var data_ = [];
+                for (var i=0; i < messages.length; i++) {
+                    data_.push({name:"m", value:messages[i]});
+                }
+                var startTS = encodeDate(tmax);
+                data_.push({name:"ts", value:startTS + "_"});
+                
+                $.ajax({
+                    url: "http://localhost:8000/data/history",
+                    dataType:   "json",
+                    context:    labels,
+                    beforeSend: notifySending,
+                    error:      notifyError,
+                    success:    updatePlotIncremental,
+                    data: data_
+                });
+            }
+
+            function updatePlotIncremental(data, textStatus, jqXHR) {
+                $("#error").html("");
+                var new_rows = data["data"];
+                if (new_rows.length == 0) {
+                    $("#message").html("No new data");
+                    return;
+                } else {
+                    $("#message").html("Data received");
+                }
+                tmax = new Date(data["tmax"]+"Z");
+
+                for (var i=0; i < new_rows.length; i++) {
+                    new_rows[i][0] = new Date(new_rows[i][0]+"Z");
+                    rows.push(new_rows[i]);
+                }
+                
+                options["labels"] = ["time"] + this;
+                options["file"] = rows;
+                
+                //g = new Dygraph(document.getElementById("graphdiv"),
+                //    rows,
+                //    options
+                //);
+                if (g == null) {
+                    g = new Dygraph(document.getElementById("graphdiv"),
+                                    rows, options);
+                } else {
+                    g.updateOptions(options);
+                }
+            }
+            
+            $(document).ready(function() {
+                $("#update").click(requestUpdate);
+                $("#manual_limits").change(function () {
+                    if ($(this).attr("checked")) {
+                        var min_ = new Number($("#min_field"));
+                        var max_ = new Number($("#max_field"));
+                        options["valueRange"] = [min_, max_];
+                    } else {
+                        delete options["valueRange"];
+                    }
+                    g.updateOptions(options);
+                });
+                $("#auto_refresh").change(function () {
+                    if ($(this).attr("checked")) {
+                        pollInterval = setInterval(poll, 1000);
+                    } else {
+                        clearInterval(pollInterval);
+                    }
+                });
+            });
+        </script>
+    </head>
+    <body>
+        <table width="100%">
+            <tr>
+                <td valign="top">
+                    <label for="max_field">Max</label>
+                    <input type="text" id="max_field" size=6 />
+                </td>
+                <td colspan=2 rowspan=2>
+                    <div id="graphdiv">
+                    <fieldset>
+                        Select one (or more) data series and enter the start and
+                        end date/time and hit update to see historical data.
+                    </fieldset>
+                    </div>
+                </td>
+                <td rowspan=2>
+                    <select id="series" size=30 multiple>
+                        <optgroup label="Tritium">
+                            <option value="0x402:Bus Voltage">Bus Voltage (V)</option>
+                            <option value="0x402:Bus Current">Bus Current (A)</option>
+                            <option value="0x403:Motor Velocity">Motor Speed (RPM)</option>
+                            <option value="0x403:Vehicle Velocity">Vehicle Speed (m/s)</option>
+                            <option value="0x404:Phase A Current">Phase A Current (A_rms)</option>
+                            <option value="0x404:Phase B Current">Phase B Current (A_rms)</option>
+                            <option value="0x405:Vq">Voltage Vector Imag (V)</option>
+                            <option value="0x405:Vd">Voltage Vector Real (V)</option>
+                            <option value="0x406:Iq">Current Vector Imag (A)</option>
+                            <option value="0x406:Id">Current Vector Real (A)</option>
+                            <option value="0x407:BEMFq">Back EMF_q (V)</option>
+                            <option value="0x407:BEMFd">Back EMF_d (V)</option>
+                            <option value="0x40E:Odometer">Distance Travelled (m)</option>
+                            <option value="0x40E:DC Bus AmpHours">AmpHours drawn (Ah)</option>
+                        </optgroup>
+                        <optgroup label="Batteries">
+                            <optgroup label="Module 1">
+                                <option value="0x100:Cell Voltage">Cell 1.1 (V)</option>
+                                <option value="0x101:Cell Voltage">Cell 1.2 (V)</option>
+                                <option value="0x102:Cell Voltage">Cell 1.3 (V)</option>
+                                <option value="0x103:Cell Voltage">Cell 1.4 (V)</option>
+                                <option value="0x104:Cell Voltage">Cell 1.5 (V)</option>
+                                <option value="0x105:Cell Voltage">Cell 1.6 (V)</option>
+                                <option value="0x106:Cell Voltage">Cell 1.7 (V)</option>
+                                <option value="0x107:Cell Voltage">Cell 1.8 (V)</option>
+                                <option value="0x108:Cell Voltage">Cell 1.9 (V)</option>
+                                <option value="0x109:Cell Voltage">Cell 1.10 (V)</option>
+                                <option value="0x10A:Cell Voltage">Cell 1.11 (V)</option>
+                                <option value="0x10B:Cell Voltage">Cell 1.12 (V)</option>
+                                <option value="0x10C:External cell temp 1">Ext Temp Probe 1.1 (C)</option>
+                                <option value="0x10D:External cell temp 2">Ext Temp Probe 1.2 (C)</option>
+                                <option value="0x10E:External cell temp 1">Int Temp Probe 1 (C)</option>
+                            </optgroup>
+                            <optgroup label="Module 2">
+                                <option value="0x110:Cell Voltage">Cell 2.1 (V)</option>
+                                <option value="0x111:Cell Voltage">Cell 2.2 (V)</option>
+                                <option value="0x112:Cell Voltage">Cell 2.3 (V)</option>
+                                <option value="0x113:Cell Voltage">Cell 2.4 (V)</option>
+                                <option value="0x114:Cell Voltage">Cell 2.5 (V)</option>
+                                <option value="0x115:Cell Voltage">Cell 2.6 (V)</option>
+                                <option value="0x116:Cell Voltage">Cell 2.7 (V)</option>
+                                <option value="0x117:Cell Voltage">Cell 2.8 (V)</option>
+                                <option value="0x118:Cell Voltage">Cell 2.9 (V)</option>
+                                <option value="0x119:Cell Voltage">Cell 2.10 (V)</option>
+                                <option value="0x11A:Cell Voltage">Cell 2.11 (V)</option>
+                                <option value="0x11B:Cell Voltage">Cell 2.12 (V)</option>
+                                <option value="0x11C:External cell temp 1">Ext Temp Probe 2.1 (C)</option>
+                                <option value="0x11D:External cell temp 2">Ext Temp Probe 2.2 (C)</option>
+                                <option value="0x11E:External cell temp 1">Int Temp Probe 2 (C)</option>
+                            </optgroup>
+                            <optgroup label="Module 3">
+                                <option value="0x120:Cell Voltage">Cell 3.1 (V)</option>
+                                <option value="0x121:Cell Voltage">Cell 3.2 (V)</option>
+                                <option value="0x122:Cell Voltage">Cell 3.3 (V)</option>
+                                <option value="0x123:Cell Voltage">Cell 3.4 (V)</option>
+                                <option value="0x124:Cell Voltage">Cell 3.5 (V)</option>
+                                <option value="0x125:Cell Voltage">Cell 3.6 (V)</option>
+                                <option value="0x126:Cell Voltage">Cell 3.7 (V)</option>
+                                <option value="0x127:Cell Voltage">Cell 3.8 (V)</option>
+                                <option value="0x128:Cell Voltage">Cell 3.9 (V)</option>
+                                <option value="0x129:Cell Voltage">Cell 3.10 (V)</option>
+                                <option value="0x12A:Cell Voltage">Cell 3.11 (V)</option>
+                                <option value="0x12B:Cell Voltage">Cell 3.12 (V)</option>
+                                <option value="0x12C:External cell temp 1">Ext Temp Probe 3.1 (C)</option>
+                                <option value="0x12D:External cell temp 2">Ext Temp Probe 3.2 (C)</option>
+                                <option value="0x12E:External cell temp 1">Int Temp Probe 3 (C)</option>
+                            </optgroup>
+                        </optgroup>
+                        <optgroup label="MPPTs">
+                            <optgroup label="MPPT 1">
+                                <option value="0x771:Voltage In">MPPT 1 V_in (V)</option>
+                                <option value="0x771:Current In">MPPT 1 I_in (A)</option>
+                                <option value="0x771:Voltage Out">MPPT 1 V_out (V)</option>
+                                <option value="0x771:Temperature">MPPT 1 T_amb (C)</option>
+                                <option value="0x771:Flags">MPPT 1 Flags</option>
+                            </optgroup>
+                            <optgroup label="MPPT 2">
+                                <option value="0x772:Voltage In">MPPT 2 V_in (V)</option>
+                                <option value="0x772:Current In">MPPT 2 I_in (A)</option>
+                                <option value="0x772:Voltage Out">MPPT 2 V_out (V)</option>
+                                <option value="0x772:Temperature">MPPT 2 T_amb (C)</option>
+                                <option value="0x772:Flags">MPPT 2 Flags</option>
+                            </optgroup>
+                            <optgroup label="MPPT 3">
+                                <option value="0x773:Voltage In">MPPT 3 V_in (V)</option>
+                                <option value="0x773:Current In">MPPT 3 I_in (A)</option>
+                                <option value="0x773:Voltage Out">MPPT 3 V_out (V)</option>
+                                <option value="0x773:Temperature">MPPT 3 T_amb (C)</option>
+                                <option value="0x773:Flags">MPPT 3 Flags</option>
+                            </optgroup>
+                            <optgroup label="MPPT 4">
+                                <option value="0x774:Voltage In">MPPT 4 V_in (V)</option>
+                                <option value="0x774:Current In">MPPT 4 I_in (A)</option>
+                                <option value="0x774:Voltage Out">MPPT 4 V_out (V)</option>
+                                <option value="0x774:Temperature">MPPT 4 T_amb (C)</option>
+                                <option value="0x774:Flags">MPPT 4 Flags</option>
+                            </optgroup>
+                            <optgroup label="MPPT 5">
+                                <option value="0x775:Voltage In">MPPT 5 V_in (V)</option>
+                                <option value="0x775:Current In">MPPT 5 I_in (A)</option>
+                                <option value="0x775:Voltage Out">MPPT 5 V_out (V)</option>
+                                <option value="0x775:Temperature">MPPT 5 T_amb (C)</option>
+                                <option value="0x775:Flags">MPPT 5 Flags</option>
+                            </optgroup>
+                        </optgroup>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <td valign="bottom">
+                    <label for="min_field">Min</label>
+                    <input type="text" id="min_field" size=6 />
+                </td>
+            </tr>
+            <tr>
+                <td></td>
+                <td align="left">
+                    <label for="start_field">Start</label>
+                    <input type="text" id="start_field" />
+                </td>
+                <td align="right">
+                    <label for="end_field">End</label>
+                    <input type="text" id="end_field" />
+                </td>
+                <td>
+                    <input type="button" id="update" value="Update"/>
+                </td>
+            </tr>
+        </table>
+        <fieldset>
+            <legend>Messages</legend>
+            <div id="error"></div><br/>
+            <div id="message"></div>
+        </fieldset>
+        <fieldset>
+            <legend>Options</legend>
+            <input type="checkbox" id="auto_refresh" value=1 title="Refresh the plot every second with new data">Automatically poll for data</input/>
+            <input disabled type="checkbox" id="manual_limits" value=1 title="Use the specified min/max y values instead of using the automatically calculated ones. Doesn't work yet :(">Use manual limits</input>
+        </fieldset>
+    </body>
+</html>

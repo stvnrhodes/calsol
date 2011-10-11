@@ -1,6 +1,5 @@
-from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
-#from SocketServer import ThreadingMixIn
-
+from BaseHTTPServer import HTTPServer
+from httplite import *
 import datetime
 import glob
 import json
@@ -9,16 +8,12 @@ import os
 from urllib import unquote
 import urlparse
 import re
-import serial
 import sqlite3
-import traceback
+from textwrap import dedent
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
-
-from odict import OrderedDict
+def normalize(id_):
+    "Normalize a packet id in hex so that capitalization is consistent"
+    return "%#x" % int(id_, 16)
 
 class TelemetryServer(HTTPServer):
     DB_ERROR_LIMIT = 5
@@ -33,73 +28,6 @@ class TelemetryServer(HTTPServer):
         self.db_error_count = 0
 
         self.shutdown = False
-
-    def connect_db(self, config):
-        if self.db_connection is not None:
-            self.disconnect_db()
-
-        try:
-            parse_everything = (sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
-            self.db_connection  = sqlite3.connect(config["database"],
-                                                 detect_types = parse_everything)
-        except KeyError:
-            logging.error("Unable to connect to database - path to database missing from config %r", config)
-            return False
-        except sqlite3.Error:
-            logging.exception("Unable to connect to database '%s' due to a database error", config["database"])
-            return False
-        except:
-            logging.exception("Unable to connect to database '%s' due to a general error", config["database"])
-            return False
-
-        logging.info("Connected to database %s", config["database"])
-        return True
-
-    def disconnect_db(self):
-        if self.db_connection is not None:
-            logging.info("Committing data before closing database connection %r", self.db_connection)
-            self.db_connection.commit()
-            logging.info("Closing database connection %r", self.db_connection)
-            self.db_connection.close()
-            logging.info("Closed database connection")
-            self.db_connection = None
-            self.db_error_count = 0
-        else:
-            logging.warning("Tried to disconnect database connection but no database was connected")
-    
-    def load_can_messages(self, id_, name, lower=None, upper=None):
-        try:
-            descr = self.can_descriptors[id_]
-        except KeyError:
-            logging.error("Loading data from database failed - no descriptor found for packet with id %s", id_)
-            return []
-
-        if self.db_connection is None:
-            logging.warning("Trying to access database without an active connection")
-            return []
-        if not lower and not upper:
-            logging.warning("Trying to execute unbounded query - returning empty list instead")
-            return []
-        base = "SELECT time, data FROM messages WHERE id = ? AND name = ? AND "
-        try:
-            if lower is not None and upper is None:
-                where = "time >= ?"
-                rows = self.db_connection.execute(base + where, [int(id_, 16), name, lower])
-            elif lower is None and upper is not None:
-                where = "time <= ?"
-                rows = self.db_connection.execute(base + where, [int(id_, 16), name, upper])
-            else:
-                where = "time >= ? AND time <= ?"
-                rows = self.db_connection.execute(base + where, [int(id_, 16), name, lower, upper])
-        except:
-            logging.exception("Error occurred while loading data from database")
-            return []
-        else:
-            messages = []
-            for row in rows:
-                ts, datum = row[0], row[1]
-                messages.append((ts.strftime("%Y-%m-%d %H:%M:%S.%f"), json.loads(datum)))
-            return messages
 
     def load_can_descriptors(self, config):
         if self.descriptor_sets:
@@ -137,96 +65,15 @@ class TelemetryServer(HTTPServer):
 
     def setup(self):
         self.load_can_descriptors({})
-        if not self.connect_db({'database': 'telemetry.db'}):
-            logging.critical("Failed to connect to database")
-        
-class HTTPRequest(object):
-    def __init__(self, url, command, headers, body):
-        self.url = url
-        self.command = command
-        self.headers = headers
-        self.body = body
-        self._query = None
-        self._query_list = None
-
-    @property
-    def query(self):
-        if self._query is None:
-            self._query = urlparse.parse_qs(self.url.query)
-        return self._query
-
-    @property
-    def query_list(self):
-        if self._query_list is None:
-            self._query_list = urlparse.parse_qsl(self.url.query, keep_blank_values=True)
-        return self._query_list
-    
-    @property
-    def fragment(self):
-        return self.url.fragment
-
-class HTTPResponse(object):
-    def __init__(self, status=200, headers=None, body=None, content_type=None):
-        self.status = status
-        self.headers = headers if headers is not None else OrderedDict()
-        if content_type is not None:
-            self.headers["Content-Type"] = content_type
-            
-        if hasattr(body, 'getvalue'):
-            self.body = body
-        elif isinstance(body, basestring):
-            self.body = StringIO(body)
-        else:
-            self.body = StringIO()
-
-class StaticHTTPResponse(HTTPResponse):
-    def __init__(self, path, content_type=None):
-        status = 200
-        body = None
-        try:
-            f = open(path, 'r')
-            body = f.read()
-        except IOError:
-            logging.exception("Unable to open static content")
-            status = 500
-        else:
-            f.close()
-
-        if not content_type:
-            if path.endswith(".js"):
-                content_type = "text/javascript"
-            elif path.endswith(".css"):
-                content_type = "text/css"
-            elif path.endswith(".txt"):
-                content_type = "text/plain"
-            elif path.endswith(".jpg") or path.endswith(".jpeg"):
-                content_type = "image/jpeg"
-            elif path.endswith(".png"):
-                content_type = "image/png"
-            elif path.endswith(".ico"):
-                content_type = "image/x-icon"
-        HTTPResponse.__init__(self, status, {}, body, content_type)
-        if body is not None:
-            self.headers['Content-Length'] = len(body)
-        
-def allow(*commands):
-    allowed = frozenset(commands)
-    def decorator(handler):        
-        def wrapped_handler(self, request):
-            if request.command not in allowed:
-                resp = HTTPResponse(405, headers={"Allow": ', '.join(allowed)})
-                return resp
-            else:
-                return handler(self, request)
-        return wrapped_handler
-    return decorator
 
 delta_units = ['weeks', 'days', 'hours', 'mins', 'secs']
 delta_pattern = ''.join((r'(?:(?P<%s>0|[1-9]\d*)%s(?:%ss?)?)?' %
                          (unit, unit[0], unit[1:-1])) for unit in delta_units)
 delta_regex = re.compile(delta_pattern, re.I)
 def parse_timestamp(ts):
-    if ts.startswith('-'):
+    if not ts:
+        raise ValueError("No timestamp found")
+    elif ts.startswith('-'):
         now = datetime.datetime.utcnow()
         match = delta_regex.match(ts[1:])
         if not match or not any(match.groups()):
@@ -243,219 +90,81 @@ def parse_timestamp(ts):
         try:
             return datetime.datetime.strptime(ts, "%Y%m%d%H%M%S")
         except ValueError:
-            raise ValueError("Invalid timestamp doesn't match compact ISO format")
+            raise ValueError("Invalid timestamp %s doesn't match compact ISO format" % ts)
 
-class TelemetryHTTPHandler(BaseHTTPRequestHandler):
-    def _respond(self, handler, request, disable_500=False):
+def parse_timespan(r):
+    if not r:
+        raise ValueError("No time span specified")
+    if "_" not in r:
+        raise ValueError("Invalid time span '%s' doesn't match format [start]_[end]" % r)
+    start, end = r.split("_", 1)
+    
+    start_ts = parse_timestamp(start) if start else None
+    end_ts = parse_timestamp(end) if end else None
+
+    return (start_ts, end_ts)
+
+class TelemetryHTTPHandler(LiteHTTPHandler):
+    def setup(self):
+        LiteHTTPHandler.setup(self)
+        self.db_connection = None
         try:
-            response = handler(request)
-            content = response.body.getvalue()
-            self.send_response(response.status)
-            for header, value in response.headers.items():
-                self.send_header(header, value)
-            if "Content-Length" not in response.headers:
-                self.send_header("Content-Length", len(content))
-            self.end_headers()
-            self.wfile.write(content)
-            response.body.close()
+            parse_everything = (sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
+            self.db_connection  = sqlite3.connect(config["database"],
+                                                 detect_types = parse_everything)
+        except KeyError:
+            logging.error("Unable to connect to database - path to database missing from config %r", config)
+            return False
+        except sqlite3.Error:
+            logging.exception("Unable to connect to database '%s' due to a database error", config["database"])
+            return False
         except:
-            if not disable_500:
-                self._respond(self.handle_500, request, disable_500=True)
-    
-    def do(self, action):
-        url = urlparse.urlparse(self.path, 'http')
-        url.is_index = url.path.endswith('/')
-        url.depth = url.path.rstrip('/').count('/')
-        url.segments = url.path.strip('/').split('/')
-        request = HTTPRequest(url, action, self.headers, self.rfile)
-        
-        handler = self.map_handler(url)
-        if handler is None:
-            self._respond(self.handle_404, request)
-        else:
-            self._respond(handler, request)
+            logging.exception("Unable to connect to database '%s' due to a general error", config["database"])
+            return False
 
-    def do_GET(self):
-        self.do('GET')
+        logging.info("Connected to database %s", config["database"])
+        return True
 
-    def do_POST(self):
-        self.do('POST')
+    def finish(self):
+        LiteHTTPHandler.finish(self)
+        if self.db_connection:
+            self.db_connection.close()
+        self.db_connection = None
 
-    def do_PUT(self):
-        self.do('PUT')
 
-    def do_HEAD(self):
-        self.do('HEAD')
-
-    def do_DELETE(self):
-        self.do('DELETE')
-
-    def handle_404(self, request):
-        resp = HTTPResponse(404, content_type="text/html")
-        resp.body.write("<html>\n")
-        resp.body.write("    <head><title>Page not found</title></head>\n")
-        resp.body.write("    <body><p>The url you attempted to access, <code>%s</code>, could not be found.</p></body>\n" % request.url.path)
-        resp.body.write("</html>\n")
-
-        return resp
-
-    def handle_500(self, request):
-        resp = HTTPResponse(500, content_type="text/html")
-        traceback.print_exc()
-        resp.body.write("<html>\n")
-        resp.body.write("    <head><title>Server Error</title></head>\n")
-        resp.body.write("    <body>\n")
-        resp.body.write("        <p>While rendering the resource at <code>%s</code> an error occurred:</p>\n" % request.url.path)
-        resp.body.write("        <pre>%s</pre>\n" % traceback.format_exc())
-        resp.body.write("    </body>\n")
-        resp.body.write("</html>\n")
-
-        return resp
-
-    @allow('GET')
-    def handle_static(self, request):
-        segments = [segment for segment in request.url.segments if not segment.startswith(".")]
-        if request.url.is_index:
-            segments.append("index.html")
-        path = os.path.join("html", *segments)
-        if not path.startswith("html"):
-            return self.handle_404(request)
-
-        if not os.path.exists(path):
-            return self.handle_404(request)
-        
-        return StaticHTTPResponse(path)
-
-    @allow('GET')
-    def handle_descr_index(self, request):
-        resp = HTTPResponse(200, content_type="text/html")
-        resp.body.write("""\
-<html>
-    <head>
-        <title>CAN Node Documentation</title>
-    </head>
-    <body>
-        <p>The following is a list of links to metadata about the format of
-           <acronym title="Controller Area Network">CAN</acronym> packets
-           sent by each CAN node on Impulse:
-        </p>
-        <ul>
-""")
-        for node in sorted(self.server.descriptor_sets.keys()):
-            resp.body.write('            <li><a href="%s/">%s</li>\n' % (node, node))
-        resp.body.write("""\
-        </ul>
-    </body>
-</html>""")
-        return resp
-
-    @allow('GET')#, 'HEAD', 'PUT', 'DELETE')
-    def handle_descr(self, request):
-        if request.url.depth != 2:
-            return self.handle_404(request)
-        group = request.url.segments[1]
-        if group in self.server.descriptor_sets:
-            descr = self.server.descriptor_sets[group]
-        elif group in self.server.can_descriptors:
-            descr = self.server.can_descriptors[group]
-        else:
-            return self.handle_404(request)
-
-        return HTTPResponse(200,
-                            content_type="text/plain",
-                            body=json.dumps(descr, indent=4))
-    
-    @allow('GET')
-    def handle_data_index(self, request):
-        return HTTPResponse(200, content_type="text/plain", body="Hello, world!")
-
-    @allow('GET')
-    def handle_data(self, request):
-        if request.url.depth not in (2, 3):
-            return self.handle_404(request)
-
-        packet_id = request.url.segments[1]
-        if packet_id not in self.server.can_descriptors:
-            return self.handle_404(request)
-
-        descr = self.server.can_descriptors[packet_id]
-
-        message_name = None
-        if request.url.depth == 3:
-            message_name = unquote(request.url.segments[2])
-            if message_name not in set(d[0] for d in descr["messages"]):
-                return self.handle_404(request)
-        
-        filter_ = request.query.get('filter')[0] if request.query.get('filter') else 'latest'
-        lower = request.query.get('after')[0] if request.query.get('after') else None
-        upper = request.query.get('before')[0] if request.query.get('before') else None
-
-        if lower is not None:
-            try:
-                lower = parse_timestamp(lower)
-            except ValueError:
-                return HTTPResponse(400, {"error": "timestamp after=%s is not in the relative timestamp format 1h5m or compact ISO timestamp" % lower})
-        if upper is not None:
-            try:
-                upper = parse_timestamp(upper)
-            except ValueError:
-                return HTTPResponse(400, {"error": "timestamp before=%s is not in the relative timestamp format 1h5m or compact ISO timestamp" % upper})
-        
-        if filter_ == 'latest':
-            now = datetime.datetime.utcnow()
-            #By default, return the most recent packet that is no older than
-            #ten minutes. Otherwise, return None.
-            packet = self.server.handler.packet_cache.get(packet_id)
-            if packet is None:
-                resource = None
-            elif (now - packet["time"]) > datetime.timedelta(minutes=10):
-                resource = None
-            else:
-                resource = packet.copy()
-                resource["time"] = packet["time"].strftime("%Y-%m-%d %H:%M:%S.%f")
-        elif filter_ == "after":
-            if not lower:
-                return HTTPResponse(400, content_type="application/json",
-                                    body=json.dumps({"error": "Missing parameter 'after' for filter mode 'after'"}))
-            resource = {}
-            if message_name:
-                resource = self.server.load_can_messages(packet_id, message_name, lower=lower)
-            else:
-                for message_descr in descr["messages"]:
-                    message_name = message_descr[0]
-                    messages = self.server.load_can_messages(packet_id, message_name, lower=lower)
-                    resource[message_name] = messages
-        elif filter_ == "before":
-            if not upper:
-                return HTTPResponse(400, content_type="application/json",
-                                    body=json.dumps({"error": "Missing parameter 'before' for filter mode 'before'"}))
-            resource = {}
-            if message_name:
-                resource = self.server.load_can_messages(packet_id, message_name, upper=upper)
-            else:
-                for message_descr in descr["messages"]:
-                    message_name = message_descr[0]
-                    messages = self.server.load_can_messages(packet_id, message_name, upper=upper)
-                    resource[message_name] = messages
-        elif filter_ == "between":
-            if not lower:
-                return HTTPResponse(400, content_type="application/json",
-                                    body=json.dumps({"error": "Missing parameter 'after' for filter mode 'after'"}))
-            if not upper:
-                return HTTPResponse(400, content_type="application/json",
-                                    body=json.dumps({"error": "Missing parameter 'before' for filter mode 'before'"}))
-            resource = {}
-            if message_name:
-                resource = self.server.load_can_messages(packet_id, message_name, lower=lower, upper=upper)
-            else:
-                for message_descr in descr["messages"]:
-                    message_name = message_descr[0]
-                    messages = self.server.load_can_messages(packet_id, message_name, lower=lower, upper=upper)
-                    resource[message_name] = messages
-        else:
+    def load_can_messages(self, id_, name, lower=None, upper=None):
+        try:
+            descr = self.server.can_descriptors[id_]
+        except KeyError:
+            logging.error("Loading data from database failed - no descriptor found for packet with id %s", id_)
             return []
-        return HTTPResponse(200, content_type="application/json",
-                            body=json.dumps(resource))
+
+        if self.db_connection is None:
+            logging.warning("Trying to access database without an active connection")
+            return []
+        if not lower and not upper:
+            logging.warning("Trying to execute unbounded query - returning empty list instead")
+            return []
+        base = "SELECT time, data FROM data WHERE id = ? AND name = ? AND "
+        try:
+            if lower is not None and upper is None:
+                where = "time >= ?"
+                rows = self.db_connection.execute(base + where, [int(id_, 16), name, lower])
+            elif lower is None and upper is not None:
+                where = "time <= ?"
+                rows = self.db_connection.execute(base + where, [int(id_, 16), name, upper])
+            else:
+                where = "time >= ? AND time <= ?"
+                rows = self.db_connection.execute(base + where, [int(id_, 16), name, lower, upper])
+        except:
+            logging.exception("Error occurred while loading data from database")
+            return []
+        else:
+            data = {}
+            for row in rows:
+                ts, datum = row[0], row[1]
+                data[ts.strftime("%Y-%m-%d %H:%M:%S.%f")] = json.loads(datum)
+            return data
         
     def map_handler(self, url):
         if url.path.startswith("/descr/"):
@@ -475,9 +184,233 @@ class TelemetryHTTPHandler(BaseHTTPRequestHandler):
                 return self.handle_data
         else:
             return self.handle_static
+    
+    @allow('GET')
+    def handle_descr_index(self, request):
+        resp = HTTPResponse(200, content_type="text/html")
+        resp.body.write(dedent("""\
+        <html>
+            <head>
+                <title>CAN Node Documentation</title>
+            </head>
+            <body>
+                <p>The following is a list of links to metadata about the format of
+                   <acronym title="Controller Area Network">CAN</acronym> packets
+                   sent by each CAN node on Impulse:
+                </p>
+                <ul>"""))
+        
+        for node in sorted(self.server.descriptor_sets.keys()):
+            resp.body.write(8*' ' + '<li><a href="%s/">%s</li>\n' % (node, node))
+
+        resp.body.write(dedent("""\
+                </ul>
+            </body>
+        </html>"""))
+        return resp
+
+    @allow('GET')
+    def handle_static(self, request):
+        segments = [segment for segment in request.url.segments if not segment.startswith(".")]
+        if request.url.is_index:
+            segments.append("index.html")
+        path = os.path.join("html", *segments)
+        if not path.startswith("html"):
+            return self.handle_404(request)
+
+        if not os.path.exists(path):
+            return self.handle_404(request)
+        
+        return StaticHTTPResponse(path)
+
+    @allow('GET')#, 'HEAD', 'PUT', 'DELETE')
+    def handle_descr(self, request):
+        if request.url.depth != 2:
+            return self.handle_404(request)
+        group = request.url.segments[1]
+        if group in self.server.descriptor_sets:
+            descr = self.server.descriptor_sets[group]
+        elif group in self.server.can_descriptors:
+            descr = self.server.can_descriptors[group]
+        else:
+            return self.handle_404(request)
+
+        return HTTPResponse(200,
+                            content_type="text/plain",
+                            body=json.dumps(descr, indent=4))
+    
+    @allow('GET')
+    def handle_data_index(self, request):
+        return StaticHTTPResponse("html/historical-viewer.html")
+        #return HTTPResponse(200, content_type="text/plain", body="Hello, world!")
+
+    @allow('GET')
+    def handle_data(self, request):
+        if request.url.depth != 2:
+            return self.handle_404(request)
+
+        if request.url.segments[1] not in ("history", "since"):
+            return self.handle_404(request)
+
+        if request.url.segments[1] == "history":
+            if not request.query.get("m"):
+                return HTTPResponse(500,
+                                    content_type="text/plain",
+                                    body="No messages were specified")
+            
+            try:
+                start, end = parse_timespan(request.query_first("ts"))
+            except ValueError as e:
+                return HTTPResponse(500, content_type="text/plain",
+                                    body=str(e))
+            
+            if not (start or end):
+                return HTTPResponse(500, content_type="text/plain",
+                                    body="No timespan specified")
+            
+            messages = request.query["m"]
+            idents = []
+            for msg in messages:
+                try:
+                    id_, name = msg.split(":")
+                    id_ = normalize(id_)
+                except ValueError as e:
+                    return HTTPResponse(500, content_type="text/plain",
+                                        body=str(e))
+                if id_ not in self.server.can_descriptors:
+                    return HTTPResponse(500, content_type="text/plain",
+                                        body=("Unknown packet %s" % id_))
+                descr = self.server.can_descriptors[id_]
+                if name not in [msg[0] for msg in descr["messages"]]:
+                    return HTTPResponse(500, content_type="text/plain",
+                                        body=("Unknown message '%s' in packet %s" % (name, id_)))
+                idents.append((id_, name))
+
+            data_maps = []
+            time_points = set()
+            for (id_, name) in idents:
+                data = self.load_can_messages(id_, name, start, end)
+                data_maps.append(data)
+
+                time_points.update(data.keys())
+            rows = []
+            if not time_points:
+                resource = {
+                    "data": [],
+                    "tmin": None,
+                    "tmax": None
+                }
+            else:
+                points = list(sorted(time_points))
+                for ts in points:
+                    row = [ts]
+                    row.extend(data_map.get(ts) for data_map in data_maps)
+                    rows.append(row)
+                resource = {
+                    "data": rows,
+                    "tmin": points[0],
+                    "tmax": points[-1]
+                }
+
+            return HTTPResponse(200, content_type="application/json",
+                                body=json.dumps(resource))
+            
+##            x = start.strftime("%Y-%m-%d %H:%M:%S.%f") if start else ""
+##            y = end.strftime("%Y-%m-%d %H:%M:%S.%f") if end else ""
+##            return HTTPResponse(200,
+##                                content_type="application/json",
+##                                body=json.dumps({
+##                                    "start":x,
+##                                    "end":y,
+##                                    "messages": messages
+##                                    }))
+##
+##        packet_id = request.url.segments[1]
+##        if packet_id not in self.server.can_descriptors:
+##            return self.handle_404(request)
+##
+##        descr = self.server.can_descriptors[packet_id]
+##
+##        message_name = None
+##        if request.url.depth == 3:
+##            message_name = unquote(request.url.segments[2])
+##            if message_name not in set(d[0] for d in descr["messages"]):
+##                return self.handle_404(request)
+##        
+##        filter_ = request.query.get('filter')[0] if request.query.get('filter') else 'latest'
+##        lower = request.query.get('after')[0] if request.query.get('after') else None
+##        upper = request.query.get('before')[0] if request.query.get('before') else None
+##
+##        if lower is not None:
+##            try:
+##                lower = parse_timestamp(lower)
+##            except ValueError:
+##                return HTTPResponse(400, {"error": "timestamp after=%s is not in the relative timestamp format 1h5m or compact ISO timestamp" % lower})
+##        if upper is not None:
+##            try:
+##                upper = parse_timestamp(upper)
+##            except ValueError:
+##                return HTTPResponse(400, {"error": "timestamp before=%s is not in the relative timestamp format 1h5m or compact ISO timestamp" % upper})
+##        
+##        if filter_ == 'latest':
+##            now = datetime.datetime.utcnow()
+##            #By default, return the most recent packet that is no older than
+##            #ten minutes. Otherwise, return None.
+##            packet = self.server.handler.packet_cache.get(packet_id)
+##            if packet is None:
+##                resource = None
+##            elif (now - packet["time"]) > datetime.timedelta(minutes=10):
+##                resource = None
+##            else:
+##                resource = packet.copy()
+##                resource["time"] = packet["time"].strftime("%Y-%m-%d %H:%M:%S.%f")
+##        elif filter_ == "after":
+##            if not lower:
+##                return HTTPResponse(400, content_type="application/json",
+##                                    body=json.dumps({"error": "Missing parameter 'after' for filter mode 'after'"}))
+##            resource = {}
+##            if message_name:
+##                resource = self.server.load_can_messages(packet_id, message_name, lower=lower)
+##            else:
+##                for message_descr in descr["messages"]:
+##                    message_name = message_descr[0]
+##                    messages = self.server.load_can_messages(packet_id, message_name, lower=lower)
+##                    resource[message_name] = messages
+##        elif filter_ == "before":
+##            if not upper:
+##                return HTTPResponse(400, content_type="application/json",
+##                                    body=json.dumps({"error": "Missing parameter 'before' for filter mode 'before'"}))
+##            resource = {}
+##            if message_name:
+##                resource = self.server.load_can_messages(packet_id, message_name, upper=upper)
+##            else:
+##                for message_descr in descr["messages"]:
+##                    message_name = message_descr[0]
+##                    messages = self.server.load_can_messages(packet_id, message_name, upper=upper)
+##                    resource[message_name] = messages
+##        elif filter_ == "between":
+##            if not lower:
+##                return HTTPResponse(400, content_type="application/json",
+##                                    body=json.dumps({"error": "Missing parameter 'after' for filter mode 'after'"}))
+##            if not upper:
+##                return HTTPResponse(400, content_type="application/json",
+##                                    body=json.dumps({"error": "Missing parameter 'before' for filter mode 'before'"}))
+##            resource = {}
+##            if message_name:
+##                resource = self.server.load_can_messages(packet_id, message_name, lower=lower, upper=upper)
+##            else:
+##                for message_descr in descr["messages"]:
+##                    message_name = message_descr[0]
+##                    messages = self.server.load_can_messages(packet_id, message_name, lower=lower, upper=upper)
+##                    resource[message_name] = messages
+##        else:
+##            return []
+##        return HTTPResponse(200, content_type="application/json",
+##                            body=json.dumps(resource))
 
 if __name__ == "__main__":
     logging.basicConfig(filename="server.log")
+    config = {"database": "test2.db"}
     httpd = TelemetryServer(('', 8000), TelemetryHTTPHandler)
     httpd.setup()
     print "Starting up"
