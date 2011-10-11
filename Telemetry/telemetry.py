@@ -285,7 +285,7 @@ class TransparentThread(QtCore.QThread):
         link(self.timer.timeout, self.process)
 
         self.commit_timer.start(5000)
-        self.timer.start(500)
+        self.timer.start(50)
 
     def process(self):
         self.stream.process()
