@@ -49,13 +49,31 @@ void loop() {
     last_sent_tritium = millis();
     updateDrivingState();
     updateCruiseState();
-    if (status == OKAY_STATUS) {
+    if (status != ERROR_STATUS) {
       driverControl();
     }
   }
   
   // Debug
-  //testPins();
+  if (millis() - last_debug_cycle > 1000) {
+    last_debug_cycle = millis();
+    testPins();
+    #ifdef DEBUG
+      Serial.print("accel: ");
+      Serial.print(accel);
+      Serial.print(", brake:");
+      Serial.print(brake);
+      Serial.print(", cruise  speed:");
+      Serial.print(set_speed);
+      Serial.print(", current speed:");
+      Serial.println(current_speed);
+      Serial.print("Cruise is ");
+      Serial.print(cruise_on);
+      Serial.print(", Driving mode is ");
+      Serial.println(state);
+    #endif
+  }
+    
   #ifdef CAN_DEBUG
     Serial.print("Can RX: ");
     Serial.print(Can.rxError());

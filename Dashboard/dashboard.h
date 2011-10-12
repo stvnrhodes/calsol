@@ -53,6 +53,7 @@ volatile unsigned long last_updated_speed = 0;
 float set_speed = 0.0;      // Desired speed based on cruise control in m/s.
 char cruise_on = OFF;         // Flag to set if cruise control is on or off.
 char regen_on = OFF;          // Flag to set if regen braking is enabled.
+char accel_cruise = OFF;  // Flag to allow using accelerator in cruise control
 volatile char tritium_reset = 0;       // Number of times to reset the tritium.
 // This is used to scale down our max output if an OC error occurs
 float overcurrent_scale = 1.0;
@@ -71,6 +72,7 @@ char horn_state   = OFF;
 
 // Global timekeeping variables
 unsigned long last_sent_tritium = 0;
+unsigned long last_debug_cycle = 0;
 unsigned long last_auxiliary_cycle = 0;
 unsigned long last_status_blink = 0;
 // Time since the last Overcurrent Error, in millis()
@@ -154,8 +156,8 @@ float adjustCruiseControl(float speed) {
  */
 // TODO: Hazard latching
 void updateAuxiliaryStates() {
-  if (!digitalRead(IN_HAZ_SWITCH)) {
-    // Hazard lights
+  if (!digitalRead(IN_HAZ_SWITCH) || status != OKAY_STATUS) {
+    // Hazard lights blink if Haz switch is on, or if the car is not okay.
     if (!hazard_state) {
       // If this state is off...
       hazard_state = ON;
@@ -312,21 +314,30 @@ void updateDrivingState() {
  * Updates whether or not the car is in cruise control.
  */
 void updateCruiseState() {
-  if (current_speed > MIN_CRUISE_CONTROL_SPEED && state == FORWARD) {
-    if (!digitalRead(IN_CRUISE_DEC)) {
+  static char is_cruise_on = FALSE;
+  if (current_speed > MIN_CRUISE_CONTROL_SPEED && state == FORWARD &&
+      !cruise_on) {
+    if (!digitalRead(IN_CRUISE_DEC) || !digitalRead(IN_CRUISE_ON)) {
       // Cruise is pressed, set cruise to whatever speed we are at.
       set_speed = current_speed;
       cruise_on = ON;
+      accel_cruise = OFF;
       digitalWrite(OUT_CRUISE_INDICATOR, ON);
     } else if (set_speed != 0.0 && !digitalRead(IN_CRUISE_ACC)) {
       // Resume old cruise speed 
       cruise_on = ON;
+      accel_cruise = OFF;
       digitalWrite(OUT_CRUISE_INDICATOR, ON);
     }
-  } else if (!digitalRead(IN_CRUISE_ON)) {
+  } else if (cruise_on && digitalRead(IN_CRUISE_ON)) {
+    // We are currently in cruise
+    is_cruise_on = TRUE;
+  } else if (is_cruise_on && !digitalRead(IN_CRUISE_ON)) {
     // Cruise is on, so we want to turn it off
     cruise_on = OFF;
     digitalWrite(OUT_CRUISE_INDICATOR, OFF);
+  } else {
+    is_cruise_on = FALSE;
   }
 }
 
@@ -371,11 +382,19 @@ void driverControl() {
       case FORWARD:
         if (cruise_on) {
           set_speed = adjustCruiseControl(set_speed);
-          // Pressing the accelerator during cruise increases speed
-          float cruise_accel = map(accel, 0, 1, set_speed, 100);
-          float cruise_accel_torque = map(accel, 0, 1, CRUISE_TORQUE_SETTING, 1);
-          sendDriveCommand(cruise_accel, cruise_accel_torque);
-        } else if (accel < 0.01) {
+          if (accel == 0.0) {
+            // If pedal is not pressed, allow acceleration
+            accel_cruise = ON;
+          }
+          if (accel_cruise) {
+            // Pressing the accelerator during cruise increases speed
+            float cruise_accel = accel * (100.0 - set_speed) + set_speed;
+            float cruise_accel_torque = accel * (1.0 - CRUISE_TORQUE_SETTING) + CRUISE_TORQUE_SETTING;
+            sendDriveCommand(cruise_accel, cruise_accel_torque);
+          } else {
+            sendDriveCommand(set_speed, CRUISE_TORQUE_SETTING);
+          }
+        } else if (accel == 0.0) {
           // Accelerator is not pressed
           sendDriveCommand(0.0, 0.0);
         } else {

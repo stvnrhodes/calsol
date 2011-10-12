@@ -97,6 +97,7 @@ void initPins() {
 #endif
 
 void testPins() {
+  Serial.print("Switches: ");
   Serial.print(digitalRead(IN_LTURN_SWITCH));
   Serial.print(",");
   Serial.print(digitalRead(IN_RTURN_SWITCH));
