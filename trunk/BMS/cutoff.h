@@ -18,6 +18,11 @@
 #include "pindef.h"
 #include <avr/pgmspace.h>
 
+/* Constants */
+// The max acceptable difference between the battery voltage and the motor
+// voltage for turning on the contactors at the end of precharge.
+#define VOLT_DELTA 10 
+
 /* State variables */
 unsigned long startTime = 0;
 unsigned long prechargeTime = 0;
@@ -250,14 +255,14 @@ void playSongs() {
 // Reads voltage from first voltage source (millivolts)
 long readV1() {
   long reading = analogRead(V1);
-  long voltage = reading * 1000000 / 3123;
+  long voltage = reading * 1000000 / 2953;
   return voltage ;
 }
 
 // Reads voltage from second voltage source (milliVolts)
 long readV2() {
   long reading = analogRead(V2);
-  long voltage = reading * 1000000 / 3123;
+  long voltage = reading * 1000000 / 2953;
   return voltage; 
 }
 
@@ -438,7 +443,7 @@ void do_precharge() {
     /* Off switch engaged, Transition to off */
     state = TURNOFF; //actually redundant
     return;
-  } else if ((prechargeV < prechargeTarget)  || (voltageDiff>6) || 
+  } else if ((prechargeV < prechargeTarget)  || (voltageDiff > VOLT_DELTA) || 
              (millis()-startTime < 1000)) {
     //wait for precharge to bring motor voltage up to battery voltage  
     /* Precharge incomplete */
@@ -464,6 +469,8 @@ void do_precharge() {
     digitalWrite(RELAY2, HIGH);
     delay(100);
     digitalWrite(LVRELAY, HIGH);
+    digitalWrite(FAN1, HIGH);
+    digitalWrite(FAN2, HIGH);
     
     /* Sound buzzer */
     digitalWrite(OUT_BUZZER, HIGH);

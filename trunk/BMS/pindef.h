@@ -60,6 +60,10 @@ void initPins() {
   pinMode(RELAY2, OUTPUT);
   pinMode(RELAY3, OUTPUT);
   pinMode(LVRELAY, OUTPUT);
+  digitalWrite(RELAY1, LOW);
+  digitalWrite(RELAY2, LOW);
+  digitalWrite(RELAY3, LOW);
+  digitalWrite(LVRELAY, LOW);
   
   // LEDs
   pinMode(LEDFAIL, OUTPUT);
@@ -90,8 +94,8 @@ void initPins() {
   
   // Fans
   pinMode(FAN1, OUTPUT);
-  digitalWrite(FAN1, HIGH);
+  digitalWrite(FAN1, LOW);
   pinMode(FAN2, OUTPUT);
-  digitalWrite(FAN2, HIGH);
+  digitalWrite(FAN2, LOW);
 }
 #endif

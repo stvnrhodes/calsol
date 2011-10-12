@@ -6,6 +6,8 @@
  */
 
 #define DEBUG_TEMP
+#define CAN_DEBUG
+//#define BPS_DEBUG
 
 #include <EEPROM.h>
 #include "pindef.h"
@@ -45,7 +47,8 @@ void setup() {
   Serial.println("Powering Up");  
   initBps();
   initialize(); //initialize pins and variables to begin precharge state.  
-  initCAN();
+  //initCAN();
+  Can.begin(1000);
 }
 
 /***
@@ -56,6 +59,8 @@ void setup() {
 void loop() {
   // Update internal battery voltage values and flags
   bpsUpdate();
+  
+  // Update internal 
   
   // Set errors and warnings
   warning = undervolt_warning;
@@ -108,13 +113,22 @@ void loop() {
       }
     #endif
   }
+  
+  // Send BPS CAN data.  Only sends 1 module per second, switches module every second.
   if (millis() - last_send_bps_can > 1000) {
     last_send_bps_can = millis();
     sendBpsData();
-    // printBpsData();
+    // Debug
+    #ifdef CAN_DEBUG
+      Serial.print("Can RX: ");
+      Serial.print(Can.rxError());
+      Serial.print(" TX: ");
+      Serial.print(Can.txError());
+      Serial.print(" Error Flags: ");
+      Serial.println(Can._mcp2515.read(EFLG), HEX);
+    #endif
   }
   
   // Accept serial inputs
-  processSerial();  
-
+  processSerial();
 }

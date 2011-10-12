@@ -35,8 +35,8 @@
 #define OVERVOLTAGE_ERROR_LEVEL    4.2
 #define UNDERVOLTAGE_WARNING_LEVEL 3.0
 #define UNDERVOLTAGE_ERROR_LEVEL   2.7
-#define OVERTEMP_WARNING_LEVEL 50
-#define OVERTEMP_ERROR_LEVEL 55
+#define OVERTEMP_WARNING_LEVEL 55
+#define OVERTEMP_ERROR_LEVEL 60
 
 // LT board constants
 const byte board_address[3] = { 0x80 , 0x81 , 0x82 };
@@ -200,8 +200,6 @@ void bpsSetup() {
   // Turn on fans
   pinMode(FAN1,OUTPUT);
   pinMode(FAN2,OUTPUT);
-  digitalWrite(FAN1,HIGH);
-  digitalWrite(FAN2,HIGH);
   
   // Turns on SPI
   LT_SPI_END; 
