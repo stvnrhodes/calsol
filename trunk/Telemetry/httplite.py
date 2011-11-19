@@ -90,6 +90,8 @@ class LiteHTTPHandler(BaseHTTPRequestHandler):
     def _respond(self, handler, request, disable_500=False):
         try:
             response = handler(request)
+            if response is None:
+                return
             content = response.body.getvalue() if response.body else ""
             self.send_response(response.status)
             for header, value in response.headers.items():
@@ -109,7 +111,6 @@ class LiteHTTPHandler(BaseHTTPRequestHandler):
         url.depth = url.path.rstrip('/').count('/')
         url.segments = url.path.strip('/').split('/')
         request = HTTPRequest(url, action, self.headers, self.rfile)
-        
         handler = self.map_handler(url)
         if handler is None:
             self._respond(self.handle_404, request)
