@@ -1,32 +1,30 @@
 from BaseHTTPServer import HTTPServer
+from SocketServer import ThreadingMixIn
+
 from httplite import *
+
 import datetime
 import glob
 import json
 import logging
 import os
-from urllib import unquote
-import urlparse
 import re
 import sqlite3
 from textwrap import dedent
+
+from websocket import WebSocket, SingleOptionPolicy, Message
+
 
 def normalize(id_):
     "Normalize a packet id in hex so that capitalization is consistent"
     return "%#x" % int(id_, 16)
 
-class TelemetryServer(HTTPServer):
-    DB_ERROR_LIMIT = 5
+class TelemetryServer(HTTPServer, ThreadingMixIn):
     def __init__(self, server_address, handler_class):
         HTTPServer.__init__(self, server_address, handler_class)
-        self.timeout = 0
-
-        self.db_connection = None
         self.can_descriptors = {}
         self.descriptor_sets = {}
         
-        self.db_error_count = 0
-
         self.shutdown = False
 
     def load_can_descriptors(self, config):
@@ -242,7 +240,6 @@ class TelemetryHTTPHandler(LiteHTTPHandler):
     @allow('GET')
     def handle_data_index(self, request):
         return StaticHTTPResponse("html/historical-viewer.html")
-        #return HTTPResponse(200, content_type="text/plain", body="Hello, world!")
 
     @allow('GET')
     def handle_data(self, request):
@@ -253,6 +250,11 @@ class TelemetryHTTPHandler(LiteHTTPHandler):
             return self.handle_404(request)
 
         if request.url.segments[1] == "history":
+            print request.headers
+            if request.headers.get("Upgrade") == "websocket":
+                print "Got websocket upgrade request"
+                return self.serve_data_websocket(request)
+            
             if not request.query.get("m"):
                 return HTTPResponse(500,
                                     content_type="text/plain",
@@ -268,6 +270,9 @@ class TelemetryHTTPHandler(LiteHTTPHandler):
                 return HTTPResponse(500, content_type="text/plain",
                                     body="No timespan specified")
             
+            if request.headers.get("Upgrade") == "websocket":
+                print "Got websocket upgrade request"
+                return self.serve_data_websocket(request)
             messages = request.query["m"]
             idents = []
             for msg in messages:
@@ -314,99 +319,29 @@ class TelemetryHTTPHandler(LiteHTTPHandler):
 
             return HTTPResponse(200, content_type="application/json",
                                 body=json.dumps(resource))
-            
-##            x = start.strftime("%Y-%m-%d %H:%M:%S.%f") if start else ""
-##            y = end.strftime("%Y-%m-%d %H:%M:%S.%f") if end else ""
-##            return HTTPResponse(200,
-##                                content_type="application/json",
-##                                body=json.dumps({
-##                                    "start":x,
-##                                    "end":y,
-##                                    "messages": messages
-##                                    }))
-##
-##        packet_id = request.url.segments[1]
-##        if packet_id not in self.server.can_descriptors:
-##            return self.handle_404(request)
-##
-##        descr = self.server.can_descriptors[packet_id]
-##
-##        message_name = None
-##        if request.url.depth == 3:
-##            message_name = unquote(request.url.segments[2])
-##            if message_name not in set(d[0] for d in descr["messages"]):
-##                return self.handle_404(request)
-##        
-##        filter_ = request.query.get('filter')[0] if request.query.get('filter') else 'latest'
-##        lower = request.query.get('after')[0] if request.query.get('after') else None
-##        upper = request.query.get('before')[0] if request.query.get('before') else None
-##
-##        if lower is not None:
-##            try:
-##                lower = parse_timestamp(lower)
-##            except ValueError:
-##                return HTTPResponse(400, {"error": "timestamp after=%s is not in the relative timestamp format 1h5m or compact ISO timestamp" % lower})
-##        if upper is not None:
-##            try:
-##                upper = parse_timestamp(upper)
-##            except ValueError:
-##                return HTTPResponse(400, {"error": "timestamp before=%s is not in the relative timestamp format 1h5m or compact ISO timestamp" % upper})
-##        
-##        if filter_ == 'latest':
-##            now = datetime.datetime.utcnow()
-##            #By default, return the most recent packet that is no older than
-##            #ten minutes. Otherwise, return None.
-##            packet = self.server.handler.packet_cache.get(packet_id)
-##            if packet is None:
-##                resource = None
-##            elif (now - packet["time"]) > datetime.timedelta(minutes=10):
-##                resource = None
-##            else:
-##                resource = packet.copy()
-##                resource["time"] = packet["time"].strftime("%Y-%m-%d %H:%M:%S.%f")
-##        elif filter_ == "after":
-##            if not lower:
-##                return HTTPResponse(400, content_type="application/json",
-##                                    body=json.dumps({"error": "Missing parameter 'after' for filter mode 'after'"}))
-##            resource = {}
-##            if message_name:
-##                resource = self.server.load_can_messages(packet_id, message_name, lower=lower)
-##            else:
-##                for message_descr in descr["messages"]:
-##                    message_name = message_descr[0]
-##                    messages = self.server.load_can_messages(packet_id, message_name, lower=lower)
-##                    resource[message_name] = messages
-##        elif filter_ == "before":
-##            if not upper:
-##                return HTTPResponse(400, content_type="application/json",
-##                                    body=json.dumps({"error": "Missing parameter 'before' for filter mode 'before'"}))
-##            resource = {}
-##            if message_name:
-##                resource = self.server.load_can_messages(packet_id, message_name, upper=upper)
-##            else:
-##                for message_descr in descr["messages"]:
-##                    message_name = message_descr[0]
-##                    messages = self.server.load_can_messages(packet_id, message_name, upper=upper)
-##                    resource[message_name] = messages
-##        elif filter_ == "between":
-##            if not lower:
-##                return HTTPResponse(400, content_type="application/json",
-##                                    body=json.dumps({"error": "Missing parameter 'after' for filter mode 'after'"}))
-##            if not upper:
-##                return HTTPResponse(400, content_type="application/json",
-##                                    body=json.dumps({"error": "Missing parameter 'before' for filter mode 'before'"}))
-##            resource = {}
-##            if message_name:
-##                resource = self.server.load_can_messages(packet_id, message_name, lower=lower, upper=upper)
-##            else:
-##                for message_descr in descr["messages"]:
-##                    message_name = message_descr[0]
-##                    messages = self.server.load_can_messages(packet_id, message_name, lower=lower, upper=upper)
-##                    resource[message_name] = messages
-##        else:
-##            return []
-##        return HTTPResponse(200, content_type="application/json",
-##                            body=json.dumps(resource))
+
+    def serve_data_websocket(self, request):
+        
+        policy_map = {
+            "version": SingleOptionPolicy("8"),
+            "protocol": SingleOptionPolicy("telemetry.calsol.berkeley.edu")
+        }
+        try:
+            WebSocket.validate(request, policy_map)
+        except ValueError as e:
+            print e
+            return HTTPResponse(400, content_type="text/plain",
+                               body=str(e))
+        websocket = WebSocket(request, self)
+        websocket.negotiate(policy_map)
+
+        while True:
+            message = websocket.read_message()
+            print "Received:", message.payload_string
+            s = "Hello, client!"
+            import StringIO
+            reply = Message.make_text(StringIO.StringIO(s), len(s))
+            websocket.send_message(reply)
 
 if __name__ == "__main__":
     logging.basicConfig(filename="server.log")
