@@ -3,9 +3,8 @@
     <head>
         <title>Historical Viewer</title>
         <script type="text/javascript" src="/js/jquery-1.6.4.js"></script>
-        <script type="text/javascript" src="/js/dygraph-combined.js"></script>
+        <script type="text/javascript" src="/js/highcharts.js"></script>
         <script type="text/javascript">
-            g = null;
             rows = [];
             tmax = new Date("1970/01/01");
             options = {
@@ -60,31 +59,43 @@
                                  + "<pre>" + errorThrown + "</pre>");
             }
 
-            function updatePlot(data, textStatus, jqXHR) {
+            function updatePlot(resp, textStatus, jqXHR) {
                 $("#error").html("");
 
-                if (data["data"].length == 0) {
+                if (resp["data"].length == 0) {
                     $("#message").html("Received response, but there's no data in that timespan");
                     return;
                 } else {
                     $("#message").html("Data received");
                 }
-                rows = data["data"];
-                tmax = new Date(data["tmax"]+"Z");
-
-                //rows[0][0] = new Date(rows[0][0]);
-                for (var i=0; i < rows.length; i++) {
-                    rows[i][0] = new Date(rows[i][0]+"Z");
+                var series = resp["data"];
+                tmax = new Date(resp["tmax"]+"Z");
+                if (series.length != this.length) {
+                    $("#error").html("Received response, but received wrong number of data series.");
+                    return;
                 }
-                options["labels"] = ["time"] + this;
-                options["file"] = rows;
-                
-                if (g == null) {
-                    g = new Dygraph(document.getElementById("graphdiv"),
-                                    rows, options);
-                } else {
-                    g.updateOptions(options);
+                for (var i=0; i < this.length; i++) {
+                    var points = series[i];
+                    var data = [];
+                    X = points;
+                    Y = data;
+                    for (var j=0; j < points.length; j++) {
+                        var ts_millis = Date.parse(points[j][0]+"Z");
+                        var value = points[j][1];
+                        data.push([ts_millis, value])
+                    }
+                    
+                    //TODO: update existing series instead of making new ones
+                    var series_options = {
+                        data: data,
+                        name: this[i],
+                    };
+                    chart.addSeries(series_options, false, true);
                 }
+                chart.xAxis[0].setExtremes(
+                    Date.parse(resp["tmin"]+"Z"),
+                    Date.parse(resp["tmax"]+"Z"), false, false);
+                chart.redraw();
             }
             
             function requestUpdate() {
@@ -210,16 +221,35 @@
             }
             
             $(document).ready(function() {
+                chart = new Highcharts.Chart({
+                    chart: {
+                        renderTo: 'graphdiv',
+                        zoomType: 'x',
+                        type:     'line',
+                    },
+                    xAxis: {
+                        type:      'datetime',
+                        maxZoom:   10000,
+                    },
+                    plotOptions: {
+                        series: {
+                            lineWidth: 1,
+                            shadow: false,
+                            marker: {
+                                enabled: false,
+                            }
+                        },
+                    },
+                });
                 $("#update").click(requestUpdate);
                 $("#manual_limits").change(function () {
                     if ($(this).attr("checked")) {
-                        var min_ = new Number($("#min_field"));
-                        var max_ = new Number($("#max_field"));
-                        options["valueRange"] = [min_, max_];
+                        var min_ = new Number($("#min_field").val());
+                        var max_ = new Number($("#max_field").val());
+                        chart.yAxis[0].setExtremes(min_, max_, true, true);
                     } else {
-                        delete options["valueRange"];
+                        console.log("disabling manual limits not implemented");
                     }
-                    g.updateOptions(options);
                 });
                 $("#auto_refresh").change(function () {
                     if ($(this).attr("checked")) {
@@ -240,10 +270,12 @@
                 </td>
                 <td colspan=2 rowspan=2>
                     <div id="graphdiv">
+                    <!--
                     <fieldset>
                         Select one (or more) data series and enter the start and
                         end date/time and hit update to see historical data.
                     </fieldset>
+                    -->
                     </div>
                 </td>
                 <td rowspan=2>
@@ -385,8 +417,8 @@
         </fieldset>
         <fieldset>
             <legend>Options</legend>
-            <input type="checkbox" id="auto_refresh" value=1 title="Refresh the plot every second with new data">Automatically poll for data</input/>
-            <input disabled type="checkbox" id="manual_limits" value=1 title="Use the specified min/max y values instead of using the automatically calculated ones. Doesn't work yet :(">Use manual limits</input>
+            <input disabled type="checkbox" id="auto_refresh" value=1 title="Refresh the plot every second with new data">Automatically poll for data</input/>
+            <input type="checkbox" id="manual_limits" value=1 title="Use the specified min/max y values instead of using the automatically calculated ones. Doesn't work yet :(">Use manual limits</input>
         </fieldset>
     </body>
 </html>

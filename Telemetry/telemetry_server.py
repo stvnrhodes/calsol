@@ -13,7 +13,7 @@ import sqlite3
 from textwrap import dedent
 
 from websocket import WebSocket, SingleOptionPolicy, Message
-
+from postprocessing import *
 
 def normalize(id_):
     "Normalize a packet id in hex so that capitalization is consistent"
@@ -161,7 +161,8 @@ class TelemetryHTTPHandler(LiteHTTPHandler):
             data = {}
             for row in rows:
                 ts, datum = row[0], row[1]
-                data[ts.strftime("%Y-%m-%d %H:%M:%S.%f")] = json.loads(datum)
+                data[ts] = json.loads(datum)
+                #data[ts.strftime("%Y-%m-%d %H:%M:%S.%f")] = json.loads(datum)
             return data
         
     def map_handler(self, url):
@@ -240,6 +241,7 @@ class TelemetryHTTPHandler(LiteHTTPHandler):
     @allow('GET')
     def handle_data_index(self, request):
         return StaticHTTPResponse("html/historical-viewer.html")
+        #return StaticHTTPResponse("html/highcharts-test.html")
 
     @allow('GET')
     def handle_data(self, request):
@@ -273,6 +275,8 @@ class TelemetryHTTPHandler(LiteHTTPHandler):
             if request.headers.get("Upgrade") == "websocket":
                 print "Got websocket upgrade request"
                 return self.serve_data_websocket(request)
+
+            
             messages = request.query["m"]
             idents = []
             for msg in messages:
@@ -290,32 +294,27 @@ class TelemetryHTTPHandler(LiteHTTPHandler):
                     return HTTPResponse(500, content_type="text/plain",
                                         body=("Unknown message '%s' in packet %s" % (name, id_)))
                 idents.append((id_, name))
-
-            data_maps = []
-            time_points = set()
-            for (id_, name) in idents:
-                data = self.load_can_messages(id_, name, start, end)
-                data_maps.append(data)
-
-                time_points.update(data.keys())
-            rows = []
-            if not time_points:
-                resource = {
-                    "data": [],
-                    "tmin": None,
-                    "tmax": None
-                }
-            else:
-                points = list(sorted(time_points))
-                for ts in points:
-                    row = [ts]
-                    row.extend(data_map.get(ts) for data_map in data_maps)
-                    rows.append(row)
-                resource = {
-                    "data": rows,
-                    "tmin": points[0],
-                    "tmax": points[-1]
-                }
+                series = []
+                for (id_, name) in idents:
+                    data = self.load_can_messages(id_, name, start, end)
+                    polyline = list(transform_to_screen(simplify_by_extrema(sorted(data.items())),
+                                                        (start, end), (0.0, 140.0), 1600.0, 400.0))
+                    simplified = simplify_ramer_douglas_peucker(polyline, 2.0)
+                    simple_data = list(transform_to_sample(simplified,
+                                                      (start, end), (0.0, 140.0), 1600.0, 400.0))
+                    series.append([(dt.strftime("%Y-%m-%d %H:%M:%S.%f"), value) for (dt, value) in simple_data])
+                if not any(series):
+                    resource = {
+                        "data": None,
+                        "tmin": None,
+                        "tmax": None
+                    }
+                else:
+                    resource = {
+                        "data": series,
+                        "tmin": min(map(min, series))[0],
+                        "tmax": max(map(max, series))[0]
+                    }
 
             return HTTPResponse(200, content_type="application/json",
                                 body=json.dumps(resource))
