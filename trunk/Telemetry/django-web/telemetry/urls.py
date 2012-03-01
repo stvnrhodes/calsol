@@ -18,4 +18,5 @@ urlpatterns = patterns('',
     url(r'^cars/?$', 'telemetry.alpha.views.cars'),
     url(r'^api/car/([0-9]+)/?$', 'telemetry.alpha.views.car_json'),
     url(r'^car/([0-9]+)/?$', 'telemetry.alpha.views.car'),
+    url(r'^post/?$', 'telemetry.alpha.views.post'),
 )
