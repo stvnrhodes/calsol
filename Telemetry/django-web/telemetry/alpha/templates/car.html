@@ -9,6 +9,11 @@ function update() {
   $.getJSON('/api/car/{{car.pk}}', function(data){
     $("#speed").html(data.speed);
     $("#last_updated").html(data.time);
+    if (data.connected) {
+      $("#last_update").removeClass('red');
+    } else {
+      $("#last_update").addClass('red');
+    }
   });
 }
 
@@ -16,6 +21,11 @@ $(document).ready(function(){
   setInterval(update, 1000);
 });
 </script>
+<style>
+.red {
+  color: red;
+}
+</style>
 {% endblock head %}
 
 {% block container %}
