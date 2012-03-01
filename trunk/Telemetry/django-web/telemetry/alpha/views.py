@@ -47,7 +47,7 @@ def car_json(request, car_id):
     return HttpResponse(json.dumps({
       'success': 'true',
       'speed': 0,
-      'last_updated': 'Not connected.'
+      'time': 'Not connected.'
     }))
   first_packet = data_packets[0] or None
   response['speed'] = float(first_packet.speed)
@@ -70,7 +70,9 @@ def post(request):
     except DoesNotExist:
       raise PostError('Invalid id or token')
     packet = DataPacket(car=car)
-    packet.speed = request.REQUEST['speed'] if 'speed' in request.REQUEST else 0
+    speed = request.REQUEST['speed'] if 'speed' in request.REQUEST else 0
+    if speed == 'null' or not speed: speed = 0
+    packet.speed = speed
     packet.power = request.REQUEST['power'] if 'power' in request.REQUEST else 0
     packet.battery_volt = request.REQUEST['battery_volt'] if 'battery_volt' in request.REQUEST else 0
     packet.save()
