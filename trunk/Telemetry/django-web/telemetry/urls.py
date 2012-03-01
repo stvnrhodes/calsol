@@ -14,4 +14,8 @@ urlpatterns = patterns('',
 
     # Uncomment the next line to enable the admin:
     # url(r'^admin/', include(admin.site.urls)),
+    url(r'^/?$', 'telemetry.alpha.views.cars'),
+    url(r'^cars/?$', 'telemetry.alpha.views.cars'),
+    url(r'^api/car/([0-9]+)/?$', 'telemetry.alpha.views.car_json'),
+    url(r'^car/([0-9]+)/?$', 'telemetry.alpha.views.car'),
 )
