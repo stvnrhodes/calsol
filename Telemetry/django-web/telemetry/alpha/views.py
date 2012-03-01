@@ -54,6 +54,8 @@ def car_json(request, car_id):
   first_packet = data_packets[0] or None
   response['speed'] = float(first_packet.speed)
   response['time'] = 'Last updated %s' % naturaltime(first_packet.time)
+  response['lat'] = first_packet.lat
+  response['lng'] = first_packet.lng
   # It is connected if the last packet seen was less than 10 seconds ago
   response['connected'] = (datetime.now() - first_packet.time) < timedelta(0, 10)
   response['success'] = 'true'
@@ -79,6 +81,8 @@ def post(request):
     packet.speed = speed
     packet.power = request.REQUEST['power'] if 'power' in request.REQUEST else 0
     packet.battery_volt = request.REQUEST['battery_volt'] if 'battery_volt' in request.REQUEST else 0
+    packet.lat = request.REQUEST['lat'] if 'lat' in request.REQUEST else 0
+    packet.lng = request.REQUEST['lng'] if 'lng' in request.REQUEST else 0
     packet.save()
   except PostError, e:
     response['success'] = 'false'
