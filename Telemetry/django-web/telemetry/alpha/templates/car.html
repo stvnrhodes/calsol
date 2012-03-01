@@ -8,7 +8,7 @@
 function update() {
   $.getJSON('/api/car/{{car.pk}}', function(data){
     $("#speed").html(data.speed);
-    $("#last_updated").html(data.last_updated);
+    $("#last_updated").html(data.time);
   });
 }
 

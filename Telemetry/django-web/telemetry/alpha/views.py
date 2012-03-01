@@ -4,7 +4,7 @@ from django.shortcuts import render_to_response
 from django.views.decorators.csrf import csrf_protect
 from django.core.context_processors import csrf
 from django.http import HttpResponse
-from django.contrib import humanize
+from django.contrib.humanize.templatetags.humanize import naturaltime
 import json
 import random
 import string
@@ -50,8 +50,8 @@ def car_json(request, car_id):
       'last_updated': 'Not connected.'
     }))
   first_packet = data_packets[0] or None
-  response['speed'] = first_packet.speed
-  response['time'] = 'Last updated %s' % humanize.naturaltime(first_packet.time)
+  response['speed'] = float(first_packet.speed)
+  response['time'] = 'Last updated %s' % naturaltime(first_packet.time)
   response['success'] = 'true'
   return HttpResponse(json.dumps(response))
   
@@ -70,15 +70,14 @@ def post(request):
     except DoesNotExist:
       raise PostError('Invalid id or token')
     packet = DataPacket(car=car)
-    packet.speed = request.REQUEST['speed'] or 0
-    packet.power = request.REQUEST['power'] or 0
-    packet.battery_volt = request.REQUEST['battery_volt'] or 0
+    packet.speed = request.REQUEST['speed'] if 'speed' in request.REQUEST else 0
+    packet.power = request.REQUEST['power'] if 'power' in request.REQUEST else 0
+    packet.battery_volt = request.REQUEST['battery_volt'] if 'battery_volt' in request.REQUEST else 0
     packet.save()
-  except PostError(e):
+  except PostError, e:
     response['success'] = 'false'
     response['error'] = e.msg
   else:
     response['success'] = 'true'
     response['packet_id'] = packet.pk
-  finally:
-    return HttpResponse(json.dumps(response))
+  return HttpResponse(json.dumps(response))
