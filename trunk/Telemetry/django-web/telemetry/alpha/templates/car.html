@@ -7,6 +7,7 @@
 <script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?api=AIzaSyAAthgpXRTqDLqBDnHG_ZbUjNmvPfiQvv4&sensor=false"></script>
 <script>
 var map;
+var marker;
 function update() {
   $.getJSON('/api/car/{{car.pk}}', function(data){
     $("#speed").html(data.speed);
@@ -16,7 +17,9 @@ function update() {
     } else {
       $("#last_updated").addClass('red');
     }
-    map.setCenter(new google.maps.LatLng(data.lat, data.lng));
+    center = new google.maps.LatLng(data.lat, data.lng);
+    map.setCenter(center);
+    marker.setPosition(center);
   });
 }
 
@@ -27,7 +30,7 @@ $(document).ready(function(){
 
 function initialize() {
   var myOptions = {
-    zoom: 4,
+    zoom: 8,
     center: new google.maps.LatLng(0, 0),
     mapTypeId: google.maps.MapTypeId.ROADMAP
   };
@@ -35,7 +38,7 @@ function initialize() {
   map = new google.maps.Map(document.getElementById('map_canvas'),
       myOptions);
 
-  var marker = new google.maps.Marker({
+  marker = new google.maps.Marker({
     position: map.getCenter(),
     map: map,
     title: 'Click to zoom'
