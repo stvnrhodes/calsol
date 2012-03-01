@@ -12,3 +12,5 @@ class DataPacket(models.Model):
   battery_volt = models.FloatField(blank=True, null=True)
   lat = models.FloatField(blank=True, null=True)
   lng = models.FloatField(blank=True, null=True)
+  def speed_as_mph(self):
+    return float(self.speed) * 2.23693629
