@@ -5,6 +5,8 @@ from django.views.decorators.csrf import csrf_protect
 from django.core.context_processors import csrf
 from django.http import HttpResponse
 from django.contrib.humanize.templatetags.humanize import naturaltime
+from datetime import timedelta
+from datetime import datetime
 import json
 import random
 import string
@@ -52,6 +54,8 @@ def car_json(request, car_id):
   first_packet = data_packets[0] or None
   response['speed'] = float(first_packet.speed)
   response['time'] = 'Last updated %s' % naturaltime(first_packet.time)
+  # It is connected if the last packet seen was less than 10 seconds ago
+  response['connected'] = (datetime.now() - first_packet.time) < timedelta(0, 10)
   response['success'] = 'true'
   return HttpResponse(json.dumps(response))
   
