@@ -4,7 +4,7 @@
 {% block title %}{{car.name}}{% endblock title %}
 
 {% block head %}
-<script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?sensor=false"></script>
+<script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?api=AIzaSyAAthgpXRTqDLqBDnHG_ZbUjNmvPfiQvv4&sensor=false"></script>
 <script>
 function update() {
   $.getJSON('/api/car/{{car.pk}}', function(data){
