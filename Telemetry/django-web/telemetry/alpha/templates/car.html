@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{car.name}}{% endblock title %}
+
+{% block head %}
+<script>
+function update() {
+  $.getJSON('/api/car/{{car.pk}}', function(data){
+    $("#speed").html(data.speed);
+    $("#last_updated").html(data.last_updated);
+  });
+}
+
+$(document).ready(function(){
+  setInterval(update, 1000);
+});
+</script>
+{% endblock head %}
+
+{% block container %}
+<div class="hero-unit">
+  <h1 class="pull-right">
+    <span id="speed">
+      {% if not data_packets.0.speed %}
+        0
+      {% else %}
+        {{data_packets.1.speed}}
+      {% endif %}
+    </span>
+    <small>mph</small>
+  </h1>
+  <h1>{{car.name}}</h1>
+  <p id="last_updated">
+    {% if data_packets.0 %}
+      Last updated {{data_packets.0.time|naturaltime}}
+    {% else %}
+      Not connected
+    {% endif %}
+  </p>
+</div>
+<div class="row">
+  <div class="span8 offset 2">
+    
+  </div>
+</div>
+{% endblock container %}

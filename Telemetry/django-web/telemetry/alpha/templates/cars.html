@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Cars{% endblock title %}
+
+{% block container %}
+<div class="row">
+  <div class="span8 offset 2">
+    <ul class="nav nav-pills">
+      {% for car in cars %}
+        <div class="row">
+          <div class="span3">
+            <a href="/car/{{car.pk}}">
+              {{car.name}}
+            </a>
+          </div>
+          <div class="span1">
+            <form action="/cars" method="POST">
+              {% csrf_token %}
+              <input type="hidden" name="command" value="delete">
+              <input type="hidden" name="id" value="{{car.pk}}">
+              <input type="submit" value="delete">
+            </form>
+          </div>
+          <div class="span2">
+            {{car.token}}
+          </div>
+        </div>
+      {% endfor %}
+      <div class="row">
+        <form action="/cars" method="POST">
+          {% csrf_token %}
+          <input type="hidden" name="command" value="create">
+          <div class="span3">
+            <input type="text" name="name" placeholder="New car name">
+          </div>
+          <div class="span1">
+            <input type="submit" value="create">
+          </div>
+        </form>
+      </div>
+    </ul>
+  </div>
+</div>
+{% endblock container %}
