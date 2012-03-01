@@ -10,4 +10,5 @@ class DataPacket(models.Model):
   car = models.ForeignKey(Car)
   power = models.FloatField()
   battery_volt = models.FloatField()
-  
+  lat = models.FloatField()
+  lng = models.FloatField()

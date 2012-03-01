@@ -4,6 +4,7 @@
 {% block title %}{{car.name}}{% endblock title %}
 
 {% block head %}
+<script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?sensor=false"></script>
 <script>
 function update() {
   $.getJSON('/api/car/{{car.pk}}', function(data){
@@ -14,12 +15,32 @@ function update() {
     } else {
       $("#last_updated").addClass('red');
     }
+    map.setCenter(new google.maps.LatLng(data.lat, data.lng));
   });
 }
 
 $(document).ready(function(){
   setInterval(update, 1000);
 });
+
+function initialize() {
+  var myOptions = {
+    zoom: 4,
+    center: new google.maps.LatLng({{data_packets.0.lat}}, {{data_packets.0.lng}}),
+    mapTypeId: google.maps.MapTypeId.ROADMAP
+  };
+
+  var map = new google.maps.Map(document.getElementById('map_canvas'),
+      myOptions);
+
+  var marker = new google.maps.Marker({
+    position: map.getCenter(),
+    map: map,
+    title: 'Click to zoom'
+  });
+}
+
+google.maps.event.addDomListener(window, 'load', initialize);
 </script>
 <style>
 .red {
@@ -51,7 +72,7 @@ $(document).ready(function(){
 </div>
 <div class="row">
   <div class="span8 offset 2">
-    
+    <div id="map_canvas"></div>
   </div>
 </div>
 {% endblock container %}
