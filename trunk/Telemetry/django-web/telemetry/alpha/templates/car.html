@@ -6,6 +6,7 @@
 {% block head %}
 <script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?api=AIzaSyAAthgpXRTqDLqBDnHG_ZbUjNmvPfiQvv4&sensor=false"></script>
 <script>
+var map;
 function update() {
   $.getJSON('/api/car/{{car.pk}}', function(data){
     $("#speed").html(data.speed);
@@ -30,7 +31,7 @@ function initialize() {
     mapTypeId: google.maps.MapTypeId.ROADMAP
   };
 
-  var map = new google.maps.Map(document.getElementById('map_canvas'),
+  map = new google.maps.Map(document.getElementById('map_canvas'),
       myOptions);
 
   var marker = new google.maps.Marker({
