@@ -50,7 +50,10 @@ function initialize() {
     title: '{{car.name}} is here!'
   });
   
-  lines = new google.maps.Polyline(line_points);
+  lines = new google.maps.Polyline({
+    map: map,
+    path: line_points
+  });
 }
 
 google.maps.event.addDomListener(window, 'load', initialize);
