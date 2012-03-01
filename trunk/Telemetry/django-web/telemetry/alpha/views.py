@@ -52,7 +52,7 @@ def car_json(request, car_id):
       'time': 'Not connected.'
     }))
   first_packet = data_packets[0] or None
-  response['speed'] = float(first_packet.speed)
+  response['speed'] = first_packet.speed_as_mph()
   response['time'] = 'Last updated %s' % naturaltime(first_packet.time)
   response['lat'] = first_packet.lat
   response['lng'] = first_packet.lng
