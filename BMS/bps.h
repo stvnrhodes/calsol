@@ -12,6 +12,8 @@
 #include "pindef.h"
 #include "can_id.h"
 
+#define LTC6803
+
 // Macros for beginning and ending LT SPI transmission
 #define LT_SPI_START digitalWrite(LT_CS,LOW)
 #define LT_SPI_END digitalWrite(LT_CS,HIGH)
@@ -24,8 +26,13 @@
 #define WRCFG 0x01   // Write config 
 #define RDCFG 0x02   // Read config 
 #define RDCV  0x04   // Read cell voltages 
-#define RDFLG 0x06   // Read voltage flags 
-#define RDTMP 0x08   // Read temperatures  
+#ifdef LTC6803
+  #define RDFLG 0x0c
+  #define RDTMP 0x0e
+#else
+  #define RDFLG 0x06   // Read voltage flags 
+  #define RDTMP 0x08   // Read temperatures  
+#endif
 #define STCVAD 0x10  // Start cell voltage A/D conversion 
 #define STTMPAD 0x30 // Start temperature A/D conversion  
 #define DSCHG 0x60   // Start cell voltage A/D allowing discharge
@@ -62,6 +69,67 @@ float battery_voltages[3][12];
 float temperatures[3][3];
 int can_current_module = 0;
 
+// Function
+void printBpsData();
+
+// Calculate PEC, n is  size of DIN
+byte getPEC(byte * din, int n) {
+  byte pec, in0, in1, in2;
+  pec = 0x41;
+  for(int j=0; j<n; j++) {
+    for(int i=0; i<8; i++) {
+      in0 = ((din[j] >> (7 - i)) & 0x01) ^ ((pec >> 7) & 0x01);
+      in1 = in0 ^ ((pec >> 0) & 0x01);
+      in2 = in0 ^ ((pec >> 1) & 0x01);
+      pec = in0 | (in1 << 1) | (in2 << 2) | ((pec << 1) & ~0x07);
+    }
+  }
+  return pec;
+}
+
+// Send to SPI, with PEC for LTC6803
+void sendMultipleToSPI(byte * data, int n) {
+  for(int i=0; i<n; i++) {
+    SPI.transfer(data[i]);
+  }
+  #ifdef LTC6803
+    SPI.transfer(getPEC(data, n));
+    Serial.print("Sending: ");
+    for(int i=0; i<n; i++) {
+      Serial.print(data[i], HEX);
+      Serial.print(", ");
+    }
+    Serial.println(getPEC(data, n), HEX);
+    #endif
+}
+
+// Get data from SPI, with PEC for LTC6803
+byte * getMultipleFromSPI(byte * data, byte info, int n) {
+  for(int i=0; i<n; i++) {
+    data[i] = SPI.transfer(info);
+  }
+  #ifdef LTC6803
+    byte pec = SPI.transfer(info);
+    Serial.print("Receiving: ");
+    for(int i=0; i<n; i++) {
+      Serial.print(data[i], HEX);
+      Serial.print(", ");
+    }
+    Serial.print(pec, HEX);
+    Serial.print(" vs ");
+    Serial.println(getPEC(data, n), HEX);
+   #ifdef BPS_DEBUG
+      if(pec != getPEC(data, n)) {
+        Serial.println("BPS: Problem with PEC");
+      }
+    #endif
+  #endif
+}
+
+void sendToSPI(byte data) {
+  sendMultipleToSPI(&data, 1);
+}
+
 // Init SPI
 void initBps() {
   SPI.begin();
@@ -73,39 +141,33 @@ void initBps() {
 // Write config to the LT board's configuration
 void writeConfig(byte* config) {
   LT_SPI_START;
-  SPI.transfer(WRCFG);  // Configuration is written to all chips
-  for(int i=0; i<6; i++) {
-    SPI.transfer(config[i]);
-  }
+  sendToSPI(WRCFG);  // Configuration is written to all chips
+  sendMultipleToSPI(config, 6);
   LT_SPI_END; 
 }
 
 // Write config to a single board
 void writeConfig(byte* config, byte board) {
   LT_SPI_START;
-  SPI.transfer(board);  // Non-broadcast command
-  SPI.transfer(WRCFG);  // Configuration is written to all chips
-  for(int i=0; i<6; i++) {
-    SPI.transfer(config[i]);
-  }
+  sendToSPI(board);  // Non-broadcast command
+  sendToSPI(WRCFG);  // Configuration is written to all chips
+  sendMultipleToSPI(config, 6);
   LT_SPI_END; 
 }
 
 // Read the configuration for a board
 void readConfig(byte*config,byte board) {
   LT_SPI_START;   
-  SPI.transfer(board);  // Board address is selected
-  SPI.transfer(RDCFG);  // Configuration is read
-  for(int i=0; i<6; i++) {
-    config[i] = SPI.transfer(RDCFG);
-  }
+  sendToSPI(board);  // Board address is selected
+  sendToSPI(RDCFG);  // Configuration is read
+  getMultipleFromSPI(config, RDCFG, 6);
   LT_SPI_END;
 }
 
 // Begins CV A/D conversion
 void beginCellVolt() {
   LT_SPI_START;
-  SPI.transfer(STCVAD);
+  sendToSPI(STCVAD);
   delay(15); //Time for conversions, approx 12ms
   LT_SPI_END;
 }
@@ -113,12 +175,10 @@ void beginCellVolt() {
 // Reads cell voltage registers  
 void readCellVolt(float* cell_voltages, byte board) {
   LT_SPI_START;
-  SPI.transfer(board);  // Board address is selected
-  SPI.transfer(RDCV);  // Cell voltages to be read
+  sendToSPI(board);  // Board address is selected
+  sendToSPI(RDCV);  // Cell voltages to be read
   byte cvr[18];  // Buffer to store unconverted values
-  for(int i=0;i<18;i++) {
-    cvr[i] = SPI.transfer(RDCV);
-  }
+  getMultipleFromSPI(cvr, RDCV, 18);
   LT_SPI_END; 
 
   // Converting cell voltage registers to cell voltages
@@ -138,11 +198,12 @@ void readCellVolt(float* cell_voltages, byte board) {
   for(int i=0;i<12;i++) {
     cell_voltages[i] = cell_voltages[i]*1.5*0.001;
   }
+  printBpsData();
 }  
 
 void beginTemp() {
   LT_SPI_START;
-  SPI.transfer(STTMPAD);
+  sendToSPI(STTMPAD);
   delay(15); //Time for conversions
   LT_SPI_END;
 }
@@ -165,12 +226,10 @@ void readTemp(float* temperatures, byte board) {
   // Start Temperature ADC conversions
   beginTemp();
   LT_SPI_START;
-  SPI.transfer(board); //board address is selected
-  SPI.transfer(RDTMP); //temperatures to be read
+  sendToSPI(board); //board address is selected
+  sendToSPI(RDTMP); //temperatures to be read
   byte tempr[5];
-  for(int i=0;i<5;i++) {
-    tempr[i] = SPI.transfer(RDTMP);
-  }
+  getMultipleFromSPI(tempr, RDTMP, 5);
   LT_SPI_END;
   //convert temperature registers to temperatures
   raw_temperatures[0] = (tempr[0] & 0xFF) | (tempr[1] & 0x0F) << 8;
@@ -274,7 +333,7 @@ void sendBpsData() {
   }
 }
 
-/***
+/***se
  * Queries all LT boards and update internal state.  Raise flags if needed.
  */
 void bpsUpdate() {
