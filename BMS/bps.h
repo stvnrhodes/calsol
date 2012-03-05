@@ -12,7 +12,7 @@
 #include "pindef.h"
 #include "can_id.h"
 
-#define LTC6803
+//#define LTC6803
 
 // Macros for beginning and ending LT SPI transmission
 #define LT_SPI_START digitalWrite(LT_CS,LOW)
@@ -94,12 +94,12 @@ void sendMultipleToSPI(byte * data, int n) {
   }
   #ifdef LTC6803
     SPI.transfer(getPEC(data, n));
-    Serial.print("Sending: ");
-    for(int i=0; i<n; i++) {
-      Serial.print(data[i], HEX);
-      Serial.print(", ");
-    }
-    Serial.println(getPEC(data, n), HEX);
+ //   Serial.print("Sending: ");
+ //   for(int i=0; i<n; i++) {
+ //     Serial.print(data[i], HEX);
+ //     Serial.print(", ");
+ //   }
+ //   Serial.println(getPEC(data, n), HEX);
     #endif
 }
 
@@ -110,14 +110,14 @@ byte * getMultipleFromSPI(byte * data, byte info, int n) {
   }
   #ifdef LTC6803
     byte pec = SPI.transfer(info);
-    Serial.print("Receiving: ");
-    for(int i=0; i<n; i++) {
-      Serial.print(data[i], HEX);
-      Serial.print(", ");
-    }
-    Serial.print(pec, HEX);
-    Serial.print(" vs ");
-    Serial.println(getPEC(data, n), HEX);
+   // Serial.print("Receiving: ");
+  //  for(int i=0; i<n; i++) {
+    //  Serial.print(data[i], HEX);
+  //    Serial.print(", ");
+   // }
+   // Serial.print(pec, HEX);
+   // Serial.print(" vs ");
+  //  Serial.println(getPEC(data, n), HEX);
    #ifdef BPS_DEBUG
       if(pec != getPEC(data, n)) {
         Serial.println("BPS: Problem with PEC");
