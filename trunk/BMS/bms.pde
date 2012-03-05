@@ -6,7 +6,7 @@
  */
 
 #define DEBUG_TEMP
-#define CAN_DEBUG
+//#define CAN_DEBUG
 //#define BPS_DEBUG
 
 #include <EEPROM.h>

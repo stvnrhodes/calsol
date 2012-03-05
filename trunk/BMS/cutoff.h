@@ -115,7 +115,7 @@ PROGMEM const char *errorCode_lookup[] = {
 };
 
 //number of valid shutdown types
-unsigned int numErrorCodes = 20; 
+unsigned int numErrorCodes = 18; 
 
 /* Prints out the shutdown Reason */
 /* strings containing error messages are contained in program memory to save SRAM space */
