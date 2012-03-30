@@ -95,7 +95,7 @@ void sendMultipleToSPI(byte * data, int n) {
   #ifdef LTC6803
     SPI.transfer(getPEC(data, n));
  //   Serial.print("Sending: ");
- //   for(int i=0; i<n; i++) {
+  //  for(int i=0; i<n; i++) {
  //     Serial.print(data[i], HEX);
  //     Serial.print(", ");
  //   }
@@ -269,9 +269,10 @@ void bpsSetup() {
 }
 void printBpsData() {
   // Set number of cells correctly.  Module 2 has 11 cells.
-  int length = 12;
-  if (can_current_module == 2) {
-    length = 11;
+  // As of March 2012, Module 0 also has 11 cells.
+  int length = 11;
+  if (can_current_module == 1) {
+    length = 12;
   }
   float* cell_voltages = battery_voltages[can_current_module];
   float* module_temperatures = temperatures[can_current_module];
@@ -298,9 +299,10 @@ void printBpsData() {
  */
 void sendBpsData() {
   // Set number of cells correctly.  Module 2 has 11 cells.
-  int length = 12;
-  if (can_current_module == 2) {
-    length = 11;
+  // As of March 2012, Module 0 also has 11 cells.
+  int length = 11;
+  if (can_current_module == 1) {
+    length = 12;
   }
   float* cell_voltages = battery_voltages[can_current_module];
   float* module_temperatures = temperatures[can_current_module];
@@ -344,9 +346,9 @@ void bpsUpdate() {
   for(int current_board=0; current_board < 3; current_board++) {
     float* current_board_voltages = battery_voltages[current_board];
     // Set number of cells to 12 for board 0 and 1, 11 for board 2
-    int total_cells = 12;
-    if(current_board == 2) {
-      total_cells = 10;
+    int total_cells = 11;
+    if(current_board == 1) {
+      total_cells = 12;
     }
     
     // Write configuration into the board
