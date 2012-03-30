@@ -60,4 +60,7 @@
 #define CAN_TRITIUM_CAP_TEMP    0x40D
 #define CAN_TRITIUM_ODOMETER    0x40E
 
+// Dashboard Signals
+#define CAN_DASHBOARD_INPUTS    0x481
+
 #endif
