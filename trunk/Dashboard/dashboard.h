@@ -5,6 +5,8 @@
  * Date: Oct 3rd 2011
  */
 
+
+
 /* User constants */
 #define ACCEL_THRESHOLD_LOW    100
 #define ACCEL_THRESHOLD_HIGH   850
@@ -94,13 +96,24 @@ typedef union {
  */
 void processCan(CanMessage &msg) {
   num_can++;
+  #ifdef CAN_DEBUG
+    Serial.print("CAN: ");
+    Serial.println(msg.id, HEX);
+  #endif
   if (msg.id == CAN_TRITIUM_VELOCITY) {
     last_updated_speed = millis();
     current_speed = ((two_floats*)msg.data)->f[1];
+    #ifdef VERBOSE
+      Serial.println("Tritium Speed: ");
+      Serial.println(current_speed);
+    #endif
   } else if (msg.id == CAN_TRITIUM_STATUS) {
     tritium_limit_flags = *((unsigned int*)&msg.data[0]);
     tritium_error_flags = *((unsigned int*)&msg.data[2]);
     if (msg.data[2] & 0x02) {
+      #ifdef ERRORS
+        Serial.println("Warning: Overcurrent Error");
+      #endif
       // We have an overcurrent error from the Tritium, better raise a flag.
       tritium_reset = 2;
     }
@@ -220,15 +233,17 @@ void auxiliaryControl() {
   }
   
   // Turn on brake lights if the brake pedal is stepped on.
-  digitalWrite(OUT_BRAKELIGHT, brake > 0.0);
+  brake_state = brake > 0.0;
+  digitalWrite(OUT_BRAKELIGHT, brake_state);
   
   // Turn on horn if the horn button is pressed.
-  digitalWrite(OUT_HORN, !digitalRead(IN_HORN_BUTTON));
+  horn_state = !digitalRead(IN_HORN_BUTTON);``
+  digitalWrite(OUT_HORN, horn_state);
 }
 
 /***
  * Blinks the BRAIN debug LED to indicate any status errors.
- * If okay, blink at 1Hz
+ * If okay, do not blink
  * If general error, blink at 5Hz
  * If CAN error, blink at 15Hz
  */
@@ -243,15 +258,21 @@ void blinkStatusLED() {
   if (status == OKAY_STATUS) {
     if (millis() - last_status_blink > LONG_FLASH_TIME) {
       last_status_blink = millis();
-      digitalWrite(OUT_BRAIN_LED, !digitalRead(OUT_BRAIN_LED));
+      digitalWrite(OUT_BRAIN_LED, 0);
     }
   } else if (status == CAN_ERROR_STATUS) {
     if (millis() - last_status_blink > SHORT_FLASH_TIME) {
+      #ifdef ERRORS
+        Serial.println("CAN error!");
+      #endif
       last_status_blink = millis();
       digitalWrite(OUT_BRAIN_LED, !digitalRead(OUT_BRAIN_LED));
     }
   } else {
     if (millis() - last_status_blink > MIDDLE_FLASH_TIME) {
+      #ifdef ERRORS
+        Serial.println("Error: Cannot get Tritium speed");
+      #endif
       last_status_blink = millis();
       digitalWrite(OUT_BRAIN_LED, !digitalRead(OUT_BRAIN_LED));
     }
@@ -266,6 +287,12 @@ void sendDriveCommand(float motor_velocity, float motor_current) {
   two_floats data;
   data.f[0] = motor_velocity;
   data.f[1] = motor_current;
+  #ifdef VERBOSE
+    Serial.print("CAN Packet To Tritium, Velocity ");
+    Serial.print(motor_velocity);
+    Serial.print(", Current");
+    Serial.print(motor_current);
+  #endif
   CanMessage msg = CanMessage(CAN_TRITIUM_DRIVE, data.c);
   Can.send(msg);
 }
@@ -277,10 +304,12 @@ void sendDriveCommand(float motor_velocity, float motor_current) {
 void resetTritium() {
   char data[8];
   Can.send(CanMessage(CAN_TRITIUM_RESET, data, 8));
-  Serial.print("Sending Reset. Limit: ");
-  Serial.print(tritium_limit_flags, HEX);
-  Serial.print(" Error: ");
-  Serial.println(tritium_error_flags, HEX);
+  #ifdef ERRORS
+    Serial.print("Sending Reset. Limit: ");
+    Serial.print(tritium_limit_flags, HEX);
+    Serial.print(" Error: ");
+    Serial.println(tritium_error_flags, HEX);
+  #endif
   if (overcurrent_scale > 0.6 && millis() - time_of_last_oc > 50) {
    overcurrent_scale -= 0.02;
   }
@@ -333,7 +362,7 @@ void updateCruiseState() {
     // We are currently in cruise
     is_cruise_on = TRUE;
   } else if (is_cruise_on && !digitalRead(IN_CRUISE_ON)) {
-    // Cruise is on, so we want to turn it off
+    // Cruise is on, so we want to turns it off
     cruise_on = OFF;
     digitalWrite(OUT_CRUISE_INDICATOR, OFF);
   } else {
@@ -341,11 +370,11 @@ void updateCruiseState() {
   }
 }
 
+
 /***
  * Calls a single routine of the driver routine loop.  This function reads
  * pedal inputs, adjusts for thresholds, and send CAN data to the Tritium.
  */
-// TODO: Regen switch
 void driverControl() {
   // Read raw pedal values
   int accel_input_raw = analogRead(ANALOG_ACCEL_PEDAL);
@@ -367,6 +396,13 @@ void driverControl() {
   // In case we get overcurrent errors, reduce the power we send.
   accel *= overcurrent_scale;
   brake *= overcurrent_scale;
+  #ifdef VERBOSE
+    Serial.print("accel: ");
+    Serial.println(accel);
+    Serial.print("brake: ");
+    Serial.println(brake);
+  #endif
+  
   // Send CAN data based on current state.
   if (brake > 0.0) {
     // If the brakes are tapped, cut off acceleration

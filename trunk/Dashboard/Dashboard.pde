@@ -2,12 +2,17 @@
  * Dashboard.pde - Dashboard Module
  * Purpose: Main code for the Dashboard IO module
  * Author(s): Ryan Tseng, Steven Rhodes.
- * Date: Oct 3rd 2011
+ * Date: March 30 2012
  */
  
 #include "pindef.h"
 #include "can_id.h"
 #include "dashboard.h"
+
+// Enable for more information over serial
+// #define VERBOSE
+// #define CAN_DEBUG
+#define ERRORS
 
 void setup() {
   Serial.begin(115200);
@@ -54,11 +59,12 @@ void loop() {
     }
   }
   
-  // Debug
+  // Debug and HeartBeat
   if (millis() - last_debug_cycle > 1000) {
     last_debug_cycle = millis();
+    Can.send(CanMessage(CAN_HEART_DRIVER_IO));
     testPins();
-    #ifdef DEBUG
+    #ifdef VERBOSE
       Serial.print("accel: ");
       Serial.print(accel);
       Serial.print(", brake:");
@@ -72,6 +78,12 @@ void loop() {
       Serial.print(", Driving mode is ");
       Serial.println(state);
     #endif
+    char flags = right_state << 4 |
+                 left_state << 3 |
+                 horn_state << 2 |
+                 brake_state << 1 |
+                 (state == REVERSE);
+    Can.send(CanMessage(CAN_DASHBOARD_INPUTS, &flags));
   }
     
   #ifdef CAN_DEBUG

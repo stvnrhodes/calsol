@@ -97,24 +97,26 @@ void initPins() {
 #endif
 
 void testPins() {
-  Serial.print("Switches: ");
-  Serial.print(digitalRead(IN_LTURN_SWITCH));
-  Serial.print(",");
-  Serial.print(digitalRead(IN_RTURN_SWITCH));
-  Serial.print(",");
-  Serial.print(digitalRead(IN_HAZ_SWITCH));
-  Serial.print(",");
-  Serial.print(digitalRead(IN_HORN_BUTTON));
-  Serial.print(",");
-  Serial.print(digitalRead(IN_VEHICLE_FWD));
-  Serial.print(",");
-  Serial.print(digitalRead(IN_VEHICLE_REV));
-  Serial.print(",");
-  Serial.print(digitalRead(IN_REGEN_SWITCH));
-  Serial.print(",");
-  Serial.print(digitalRead(IN_CRUISE_ON));
-  Serial.print(",");
-  Serial.print(digitalRead(IN_CRUISE_DEC));
-  Serial.print(",");
-  Serial.println(digitalRead(IN_CRUISE_ACC));
+  #ifdef VERBOSE
+    Serial.print("Switches: ");
+    Serial.print(digitalRead(IN_LTURN_SWITCH));
+    Serial.print(",");
+    Serial.print(digitalRead(IN_RTURN_SWITCH));
+    Serial.print(",");
+    Serial.print(digitalRead(IN_HAZ_SWITCH));
+    Serial.print(",");
+    Serial.print(digitalRead(IN_HORN_BUTTON));
+    Serial.print(",");
+    Serial.print(digitalRead(IN_VEHICLE_FWD));
+    Serial.print(",");
+    Serial.print(digitalRead(IN_VEHICLE_REV));
+    Serial.print(",");
+    Serial.print(digitalRead(IN_REGEN_SWITCH));
+    Serial.print(",");
+    Serial.print(digitalRead(IN_CRUISE_ON));
+    Serial.print(",");
+    Serial.print(digitalRead(IN_CRUISE_DEC));
+    Serial.print(",");
+    Serial.println(digitalRead(IN_CRUISE_ACC));
+  #endif
 }
