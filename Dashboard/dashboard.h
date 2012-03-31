@@ -237,7 +237,7 @@ void auxiliaryControl() {
   digitalWrite(OUT_BRAKELIGHT, brake_state);
   
   // Turn on horn if the horn button is pressed.
-  horn_state = !digitalRead(IN_HORN_BUTTON);``
+  horn_state = !digitalRead(IN_HORN_BUTTON);
   digitalWrite(OUT_HORN, horn_state);
 }
 

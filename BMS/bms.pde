@@ -8,6 +8,8 @@
 #define DEBUG_TEMP
 //#define CAN_DEBUG
 //#define BPS_DEBUG
+//#define VERBOSE
+//#define SPI_DEBUG
 
 #include <EEPROM.h>
 #include "pindef.h"
