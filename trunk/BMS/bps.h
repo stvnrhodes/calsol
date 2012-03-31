@@ -94,13 +94,15 @@ void sendMultipleToSPI(byte * data, int n) {
   }
   #ifdef LTC6803
     SPI.transfer(getPEC(data, n));
- //   Serial.print("Sending: ");
-  //  for(int i=0; i<n; i++) {
- //     Serial.print(data[i], HEX);
- //     Serial.print(", ");
- //   }
- //   Serial.println(getPEC(data, n), HEX);
+    #ifdef BPS_DEBUG
+      Serial.print("Sending: ");
+      for(int i=0; i<n; i++) {
+        Serial.print(data[i], HEX);
+        Serial.print(", ");
+      }
+      Serial.println(getPEC(data, n), HEX);
     #endif
+  #endif
 }
 
 // Get data from SPI, with PEC for LTC6803
@@ -110,15 +112,15 @@ byte * getMultipleFromSPI(byte * data, byte info, int n) {
   }
   #ifdef LTC6803
     byte pec = SPI.transfer(info);
-   // Serial.print("Receiving: ");
-  //  for(int i=0; i<n; i++) {
-    //  Serial.print(data[i], HEX);
-  //    Serial.print(", ");
-   // }
-   // Serial.print(pec, HEX);
-   // Serial.print(" vs ");
-  //  Serial.println(getPEC(data, n), HEX);
-   #ifdef BPS_DEBUG
+    #ifdef BPS_DEBUG
+      Serial.print("Receiving: ");
+      for(int i=0; i<n; i++) {
+        Serial.print(data[i], HEX);
+        Serial.print(", ");
+      }
+      Serial.print(pec, HEX);
+      Serial.print(" vs ");
+      Serial.println(getPEC(data, n), HEX);
       if(pec != getPEC(data, n)) {
         Serial.println("BPS: Problem with PEC");
       }
@@ -276,16 +278,18 @@ void printBpsData() {
   }
   float* cell_voltages = battery_voltages[can_current_module];
   float* module_temperatures = temperatures[can_current_module];
-  Serial.print("Module ");
-  Serial.println(can_current_module);
-  
-  // Iterate through all cells
-  for(int i=0; i<length; i++) {
-    Serial.print("Cell index ");
-    Serial.print(i);
-    Serial.print(": ");
-    Serial.println(cell_voltages[i]);
-  }
+  #ifdef VERBOSE
+    Serial.print("Module ");
+    Serial.println(can_current_module);
+    
+    // Iterate through all cells
+    for(int i=0; i<length; i++) {
+      Serial.print("Cell index ");
+      Serial.print(i);
+      Serial.print(": ");
+      Serial.println(cell_voltages[i]);
+    }
+  #endif
   
   // Increment current working module, mod 3
   can_current_module++;
