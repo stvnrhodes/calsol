@@ -21,9 +21,6 @@ function update() {
     }
     center = new google.maps.LatLng(data.lat, data.lng);
     line_points.push(center);
-    if (line_points.getLength() > 5) {
-      line_points.removeAt(0);
-    }
     map.setCenter(center);
     marker.setPosition(center);
   });

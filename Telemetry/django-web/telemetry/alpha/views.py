@@ -41,6 +41,15 @@ def car(request, car_id):
   response['data_packets'] = DataPacket.objects.filter(car=car).order_by('-time')
   return render_to_response('car.html', response)
   
+def cars_json(request): 
+  response = {}
+  cars = Car.objects.all()
+  response['cars'] = [{
+    'name': car.name,
+    'token': car.token
+  } for car in cars]
+  return HttpResponse(json.dumps(response))
+  
 def car_json(request, car_id):
   response = {}
   car = Car.objects.get(pk=car_id)
