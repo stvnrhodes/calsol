@@ -43,7 +43,11 @@ def car(request, car_id):
   
 def cars_json(request): 
   response = {'cars': {}}
-  response.update(csrf(request))
+  if 'command' in request.GET:
+    if request.GET['command'] == 'create':
+      name = request.GET['name']
+      new_car = Car(name=name, token=random_token(15))
+      new_car.save()
   cars = Car.objects.all()
   for car in cars:
     response['cars'][car.pk] = (car.name, car.token)
