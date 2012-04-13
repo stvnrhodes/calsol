@@ -42,13 +42,10 @@ def car(request, car_id):
   return render_to_response('car.html', response)
   
 def cars_json(request): 
-  response = {}
+  response = {'cars': {}}
   cars = Car.objects.all()
-  response['cars'] = [{
-    'id': car.pk,
-    'name': car.name,
-    'token': car.token
-  } for car in cars]
+  for car in cars:
+    response['cars'][car.pk] = (car.name, car.token)
   return HttpResponse(json.dumps(response))
   
 def car_json(request, car_id):
