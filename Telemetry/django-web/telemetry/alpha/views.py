@@ -48,6 +48,7 @@ def cars_json(request):
       name = request.GET['name']
       new_car = Car(name=name, token=random_token(15))
       new_car.save()
+      response['new_car'] = new_car.pk
   cars = Car.objects.all()
   for car in cars:
     response['cars'][car.pk] = (car.name, car.token)
