@@ -39,9 +39,8 @@ class WebConnect():
       exists = cur.fetchone() != None
       cur.close()
       return exists
-    if (not tableExists(self.connection, 'intervals') 
-        or not tableExists(self.connection, 'data')):
-      sys.stderr.write('Tables "intervals" and "data" do not exist in database %s, '
+    if not tableExists(self.connection, 'data'):
+      sys.stderr.write('Table "data" does not exist in database %s, '
                        'aborting\r\n' % self.database)
       sys.exit(1)
       
