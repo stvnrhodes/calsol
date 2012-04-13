@@ -43,6 +43,7 @@ def car(request, car_id):
   
 def cars_json(request): 
   response = {'cars': {}}
+  response.update(csrf(request))
   cars = Car.objects.all()
   for car in cars:
     response['cars'][car.pk] = (car.name, car.token)
