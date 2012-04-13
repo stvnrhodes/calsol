@@ -45,6 +45,7 @@ def cars_json(request):
   response = {}
   cars = Car.objects.all()
   response['cars'] = [{
+    'id': car.pk,
     'name': car.name,
     'token': car.token
   } for car in cars]
