@@ -272,9 +272,12 @@ void bpsSetup() {
 void printBpsData() {
   // Set number of cells correctly.  Module 2 has 11 cells.
   // As of March 2012, Module 0 also has 11 cells.
+  // As of April 2012, Module 0 has 10 cells.
   int length = 11;
   if (can_current_module == 1) {
     length = 12;
+  } else if (can_current_module == 0) {
+    length = 10;
   }
   float* cell_voltages = battery_voltages[can_current_module];
   float* module_temperatures = temperatures[can_current_module];
@@ -304,9 +307,13 @@ void printBpsData() {
 void sendBpsData() {
   // Set number of cells correctly.  Module 2 has 11 cells.
   // As of March 2012, Module 0 also has 11 cells.
+  // As of April 2012, Module 0 has 10 cells.
   int length = 11;
   if (can_current_module == 1) {
     length = 12;
+  }
+  if (can_current_module == 0) {
+    length = 10;
   }
   float* cell_voltages = battery_voltages[can_current_module];
   float* module_temperatures = temperatures[can_current_module];
@@ -349,10 +356,12 @@ void bpsUpdate() {
   // Iterate through all 3 LT boards
   for(int current_board=0; current_board < 3; current_board++) {
     float* current_board_voltages = battery_voltages[current_board];
-    // Set number of cells to 12 for board 0 and 1, 11 for board 2
+    // Set number of cells to 10 for board 0, 12 for board 1, 11 for board 2
     int total_cells = 11;
     if(current_board == 1) {
       total_cells = 12;
+    } else if (current_board == 0) {
+      total_cells = 10;
     }
     
     // Write configuration into the board
