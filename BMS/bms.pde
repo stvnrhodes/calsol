@@ -5,7 +5,7 @@
  * Date: Sept 25th 2011
  */
 
-#define DEBUG_TEMP
+//#define DEBUG_TEMP
 //#define CAN_DEBUG
 //#define BPS_DEBUG
 //#define VERBOSE
