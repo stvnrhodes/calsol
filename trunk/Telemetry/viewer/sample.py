@@ -51,6 +51,7 @@ class DataSource(object):
         self.queue = PriorityQueue()
         self.data = GraphData([])
         self.descriptor = desc
+        self.last_packet = None
 
         self.last_received = datetime.datetime(1993, 6, 20)
 
@@ -65,6 +66,7 @@ class DataSource(object):
         time, datum = point
         self.queue.put(point)
         self.last_received = max(self.last_received, time)
+        self.last_datum = datum
 
     def pull(self):
         "Adds all of the data from the stream's queue to its internal queue"
