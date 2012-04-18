@@ -4,9 +4,11 @@ import datetime
 import glob
 import math
 import json
+import urllib
 from Queue import Queue, PriorityQueue
 import sqlite3 as sql
 import struct
+import threading
 
 from PySide import QtGui, QtCore
 
@@ -361,8 +363,60 @@ class TelemetryApp(QtGui.QApplication):
         else:
             stream = None
         self.xombie_thread = TransparentThread(self.connection, stream)
+        
+        # For sending data to an external web server
+        self.web_connect_thread = threading.Thread(target=self.web_connect, 
+                                                   args=[stream])
+        self.web_connect_thread.daemon = True
+        self.web_connect_thread.start()
                 
         link(self.lastWindowClosed, self.closeEvent)
+        
+    
+    def web_connect(self, stream):
+        """Retrieves parameters from general.cfg, periodically uploads data 
+        to host"""
+        if not stream:
+          print 'No Adruino appears to be connected, web connect shutting down'
+          return
+        
+        # These are the packets we're looking for
+        packets = {
+            'speed': '0x403:Vehicle Velocity',
+            'power': '0x524:Current 2',
+            'battery_volt': '0x402:Bus Voltage',
+        }
+        host = self.general_options['host']
+        car_id = self.general_options['car_id']
+        car_token = self.general_options['car_token']
+        
+        # Check if we can reach the host
+        print 'Web connect started with id %s, token %s.'
+        print 'Attempting to communicate with host...'
+        try:
+          result = urllib.urlopen('%s/api/cars' % host).read()
+          cars = json.loads(result)['cars']
+          print 'Success, car name is %s' % cars[str(car_id)]['name']
+        except Exception, e:  # TODO: More specific exception?
+          print 'Error reaching url %s/api/cars\r\n' % self.host
+          print e
+        
+
+        
+        while True:
+          try:
+            packet_data = {'id': car_id, 'token': car_token}
+            for key, value in packets.items():
+              if stream.get_data(value).last_packet is None: continue
+              datum = stream.get_data(value).last_packet
+              packet_data[key] = datum
+            s = urllib.urlopen('%s/?%s' % (host, 
+                               urllib.urlencode(packet_data))).read()
+          except Exception, e:
+            print 'Failed to send data to host'
+            print e
+          time.sleep(1)
+    
 
     def run(self):
         if self.start_thread:
