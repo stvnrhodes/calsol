@@ -382,23 +382,27 @@ class TelemetryApp(QtGui.QApplication):
         
         # These are the packets we're looking for
         packets = {
-            'speed': '0x403:Vehicle Velocity',
-            'power': '0x524:Current 2',
-            'battery_volt': '0x402:Bus Voltage',
+            'speed': stream.get_data('0x403:Vehicle Velocity'),
+            'array_current': stream.get_data('0x524:Current 2'),
+            'motor_current': stream.get_data('0x524:Current 1'),
+            'tritium_volt': stream.get_data('0x402:Bus Voltage'),
+            'tritium_current': stream.get_data('0x402:Bus Current'),
+            'battery_volt': stream.get_data('0x523:Voltage 1'),
         }
         host = self.general_options['host']
         car_id = self.general_options['car_id']
         car_token = self.general_options['car_token']
         
         # Check if we can reach the host
-        print 'Web connect started with id %s, token %s.'
+        print 'Web connect started with id %s, token %s.' % (car_id, car_token)
         print 'Attempting to communicate with host...'
         try:
           result = urllib.urlopen('%s/api/cars' % host).read()
           cars = json.loads(result)['cars']
-          print 'Success, car name is %s' % cars[str(car_id)]['name']
+          name, token = cars[str(car_id)]
+          print 'Success, car name is %s' % name
         except Exception, e:  # TODO: More specific exception?
-          print 'Error reaching url %s/api/cars\r\n' % self.host
+          print 'Error reaching url %s/api/cars\r\n' % host
           print e
         
 
@@ -407,11 +411,17 @@ class TelemetryApp(QtGui.QApplication):
           try:
             packet_data = {'id': car_id, 'token': car_token}
             for key, value in packets.items():
-              if stream.get_data(value).last_packet is None: continue
-              datum = stream.get_data(value).last_packet
+              datum = value.get_last_packet()
+              if datum is None:
+                print 'Key %s is None, skipping' % key
+                continue
               packet_data[key] = datum
-            s = urllib.urlopen('%s/?%s' % (host, 
-                               urllib.urlencode(packet_data))).read()
+            request =  '%s/post?%s' % (host, urllib.urlencode(packet_data))
+            print 'Making request %s' % request
+            s = urllib.urlopen(request).read()
+            success = json.loads(s)['success']
+            if not success:
+              print 'Request Failed! Response: %s' % s
           except Exception, e:
             print 'Failed to send data to host'
             print e

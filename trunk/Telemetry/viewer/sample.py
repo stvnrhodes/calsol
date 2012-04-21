@@ -2,6 +2,7 @@ import codecs
 import datetime
 import time
 import traceback
+import threading
 
 from collections import defaultdict
 from Queue import PriorityQueue
@@ -52,6 +53,7 @@ class DataSource(object):
         self.data = GraphData([])
         self.descriptor = desc
         self.last_packet = None
+        self.lock = threading.Lock()
 
         self.last_received = datetime.datetime(1993, 6, 20)
 
@@ -66,12 +68,17 @@ class DataSource(object):
         time, datum = point
         self.queue.put(point)
         self.last_received = max(self.last_received, time)
-        self.last_datum = datum
+        with self.lock:
+          self.last_packet = datum
 
     def pull(self):
         "Adds all of the data from the stream's queue to its internal queue"
         while not self.queue.empty():
             self.data.addPoint(self.queue.get_nowait())
+    
+    def get_last_packet(self):
+      with self.lock:
+        return self.last_packet
 
     def __repr__(self):
         return "DataSource(%r)" % self.name
