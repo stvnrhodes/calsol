@@ -69,7 +69,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
       {% if not data_packets.0.speed %}
         0
       {% else %}
-        {{data_packets.1.speed_as_mph}}
+        {{data_packets.0.speed_as_mph}}
       {% endif %}
     </span>
     <small>mph</small>
@@ -84,7 +84,31 @@ google.maps.event.addDomListener(window, 'load', initialize);
   </p>
 </div>
 <div class="row">
-  <div class="span12">
+  <div class="span3">
+    <ul class="nav nav-tabs nav-stacked">
+      <li>
+        Amps: 
+        <span id="power">
+          {% if data_packets.0 %}
+            {{data_packets.0.power}} A
+          {% else %}
+            N/A
+          {% endif %}
+        </span>
+      </li>
+      <li>
+        Volts: 
+        <span id="volts">
+          {% if data_packets.0 %}
+            {{data_packets.0.battery_volt}} V
+          {% else %}
+            N/A
+          {% endif %}
+        </span>
+      </li>
+    </ul>
+  </div>
+  <div class="span9">
     <div id="map_canvas" style="width: 100%; height: 500px"></div>
   </div>
 </div>
