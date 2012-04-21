@@ -94,8 +94,12 @@ def post(request):
     speed = request.REQUEST['speed'] if 'speed' in request.REQUEST else None
     if speed == 'null' or not speed: speed = 0
     packet.speed = speed
-    packet.power = request.REQUEST['power'] if 'power' in request.REQUEST else None
+    packet.array_current = request.REQUEST['array_current'] if 'array_current' in request.REQUEST else None
+    packet.motor_current = request.REQUEST['motor_current'] if 'motor_current' in request.REQUEST else None
+    packet.tritium_volt = request.REQUEST['tritium_volt'] if 'tritium_volt' in request.REQUEST else None
+    packet.tritium_current = request.REQUEST['tritium_current'] if 'tritium_current' in request.REQUEST else None
     packet.battery_volt = request.REQUEST['battery_volt'] if 'battery_volt' in request.REQUEST else None
+    packet.gps_speed = request.REQUEST['gps_speed'] if 'gps_speed' in request.REQUEST else None
     packet.lat = request.REQUEST['lat'] if 'lat' in request.REQUEST else None
     packet.lng = request.REQUEST['lng'] if 'lng' in request.REQUEST else None
     packet.save()
