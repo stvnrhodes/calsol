@@ -68,18 +68,21 @@ def car_json(request, car_id):
   first_packet = data_packets.exclude(speed=None)[0] or None
   geo_packets = data_packets.exclude(lat=None)
   response['speed'] = '%0.1f' % first_packet.speed_as_mph()
-  response['array_current'] = '%0.3f' % first_packet.array_current
-  response['motor_current'] = '%0.3f' % first_packet.motor_current
-  response['tritium_current'] = '%0.3f' % first_packet.tritium_current
-  response['tritium_volt'] = '%0.3f' % first_packet.tritium_volt
-  response['battery_volt'] = '%0.3f' % first_packet.battery_volt
+  if first_packet.array_current:
+    response['array_current'] = '%0.3f' % (first_packet.array_current or 0.0)
+  response['motor_current'] = '%0.3f' % (first_packet.motor_current or 0.0)
+  response['tritium_current'] = '%0.3f' % (first_packet.tritium_current or 0.0)
+  response['tritium_volt'] = '%0.3f' % (first_packet.tritium_volt or 0.0)
+  response['battery_volt'] = '%0.3f' % (first_packet.battery_volt or 0.0)
   response['time'] = 'Last updated %s' % naturaltime(first_packet.time)
   if geo_packets:
     response['lat'] = geo_packets[0].lat
     response['lng'] = geo_packets[0].lng
+    response['gps_speed'] = geo_packets[0].gps_speed
   else:
     response['lat'] = None
     response['lng'] = None
+    response['gps_speed'] = None
   # It is connected if the last packet seen was less than 10 seconds ago
   response['connected'] = (datetime.now() - first_packet.time) < timedelta(0, 10)
   response['success'] = 'true'
