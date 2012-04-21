@@ -68,6 +68,11 @@ def car_json(request, car_id):
   first_packet = data_packets.exclude(speed=None)[0] or None
   first_geo_packet = data_packets.exclude(lat=None)[0] or None
   response['speed'] = '%0.1f' % first_packet.speed_as_mph()
+  response['array_current'] = '%0.3f' % first_packet.array_current
+  response['motor_current'] = '%0.3f' % first_packet.motor)current
+  response['tritium_current'] = '%0.3f' % first_packet.tritium_current
+  response['tritium_volt'] = '%0.3f' % first_packet.tritium_volt
+  response['battery_volt'] = '%0.3f' % first_packet.battery_volt
   response['time'] = 'Last updated %s' % naturaltime(first_packet.time)
   response['lat'] = first_geo_packet.lat
   response['lng'] = first_geo_packet.lng
