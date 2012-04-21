@@ -38,7 +38,8 @@ def car(request, car_id):
   response = {}
   car = Car.objects.get(pk=car_id)
   response['car'] = car
-  response['data_packets'] = DataPacket.objects.filter(car=car).order_by('-time')
+  response['data_packets'] = DataPacket.objects.filter(car=car).exclude(speed=None).order_by('-time')
+  response['data_packets_lnglat'] = DataPacket.objects.filter(car=car).exclude(lat=None, lng=None).order_by('-time')
   return render_to_response('car.html', response)
   
 def cars_json(request): 
@@ -64,11 +65,12 @@ def car_json(request, car_id):
       'speed': 0,
       'time': 'Not connected.'
     }))
-  first_packet = data_packets[0] or None
+  first_packet = data_packets.exclude(speed=None)[0] or None
+  first_geo_packet = data_packets.exclude(lat=None)[0] or None
   response['speed'] = '%0.1f' % first_packet.speed_as_mph()
   response['time'] = 'Last updated %s' % naturaltime(first_packet.time)
-  response['lat'] = first_packet.lat
-  response['lng'] = first_packet.lng
+  response['lat'] = first_geo_packet.lat
+  response['lng'] = first_geo_packet.lng
   # It is connected if the last packet seen was less than 10 seconds ago
   response['connected'] = (datetime.now() - first_packet.time) < timedelta(0, 10)
   response['success'] = 'true'
@@ -89,13 +91,13 @@ def post(request):
     except DoesNotExist:
       raise PostError('Invalid id or token')
     packet = DataPacket(car=car)
-    speed = request.REQUEST['speed'] if 'speed' in request.REQUEST else 0
+    speed = request.REQUEST['speed'] if 'speed' in request.REQUEST else None
     if speed == 'null' or not speed: speed = 0
     packet.speed = speed
-    packet.power = request.REQUEST['power'] if 'power' in request.REQUEST else 0
-    packet.battery_volt = request.REQUEST['battery_volt'] if 'battery_volt' in request.REQUEST else 0
-    packet.lat = request.REQUEST['lat'] if 'lat' in request.REQUEST else 0
-    packet.lng = request.REQUEST['lng'] if 'lng' in request.REQUEST else 0
+    packet.power = request.REQUEST['power'] if 'power' in request.REQUEST else None
+    packet.battery_volt = request.REQUEST['battery_volt'] if 'battery_volt' in request.REQUEST else None
+    packet.lat = request.REQUEST['lat'] if 'lat' in request.REQUEST else None
+    packet.lng = request.REQUEST['lng'] if 'lng' in request.REQUEST else None
     packet.save()
   except PostError, e:
     response['success'] = 'false'
