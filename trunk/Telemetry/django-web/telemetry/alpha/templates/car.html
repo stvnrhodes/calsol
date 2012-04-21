@@ -13,6 +13,11 @@ var lines;
 function update() {
   $.getJSON('/api/car/{{car.pk}}', function(data){
     $("#speed").html(data.speed);
+    $("#array_current").html(data.array_current);
+    $("#motor_current").html(data.motor_current);
+    $("#tritium_current").html(data.tritium_current);
+    $("#tritium_volt").html(data.tritium_volt);
+    $("#battery_volt").html(data.battery_volt);
     $("#last_updated").html(data.time);
     if (data.connected) {
       $("#last_updated").removeClass('red');
@@ -88,7 +93,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
     <ul class="nav nav-tabs nav-stacked">
       <li><a href="#">
         Array Current: 
-        <span id="array_current">
+        <span id="array_current" class="pull-right">
           {% if data_packets.0 %}
             {{data_packets.0.array_current}} A
           {% else %}
@@ -98,7 +103,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
       </a></li>
       <li><a href="#">
         Motor Current: 
-        <span id="motor_current">
+        <span id="motor_current" class="pull-right">
           {% if data_packets.0 %}
             {{data_packets.0.motor_current}} A
           {% else %}
@@ -108,7 +113,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
       </a></li>
       <li><a href="#">
         Tritium Current: 
-        <span id="tritium_current">
+        <span id="tritium_current" class="pull-right">
           {% if data_packets.0 %}
             {{data_packets.0.tritium_current}} A
           {% else %}
@@ -118,7 +123,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
       </a></li>
       <li><a href="#">
         Battery volts: 
-        <span id="battery_volts">
+        <span id="battery_volts" class="pull-right">
           {% if data_packets.0 %}
             {{data_packets.0.battery_volt}} V
           {% else %}
@@ -128,7 +133,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
       </a></li>
       <li><a href="#">
         Tritium volts: 
-        <span id="tritium_volts">
+        <span id="tritium_volts" class="pull-right">
           {% if data_packets.0 %}
             {{data_packets.0.tritium_volt}} V
           {% else %}
