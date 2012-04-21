@@ -65,7 +65,7 @@ def car_json(request, car_id):
       'speed': 0,
       'time': 'Not connected.'
     }))
-  first_packet = data_packets.exclude(speed=None)[0] or None
+  first_packet = data_packets.exclude(battery_volt=None)[0] or None
   geo_packets = data_packets.exclude(lat=None)
   response['speed'] = '%0.1f' % first_packet.speed_as_mph()
   if first_packet.array_current:
