@@ -123,7 +123,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
       </a></li>
       <li><a href="#">
         Battery volts: 
-        <span id="battery_volts" class="pull-right">
+        <span id="battery_volt" class="pull-right">
           {% if data_packets.0 %}
             {{data_packets.0.battery_volt}} V
           {% else %}
@@ -133,7 +133,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
       </a></li>
       <li><a href="#">
         Tritium volts: 
-        <span id="tritium_volts" class="pull-right">
+        <span id="tritium_volt" class="pull-right">
           {% if data_packets.0 %}
             {{data_packets.0.tritium_volt}} V
           {% else %}
