@@ -13,11 +13,11 @@ var lines;
 function update() {
   $.getJSON('/api/car/{{car.pk}}', function(data){
     $("#speed").html(data.speed);
-    $("#array_current").html(data.array_current);
-    $("#motor_current").html(data.motor_current);
-    $("#tritium_current").html(data.tritium_current);
-    $("#tritium_volt").html(data.tritium_volt);
-    $("#battery_volt").html(data.battery_volt);
+    $("#array_current").html(data.array_current + " A");
+    $("#motor_current").html(data.motor_current + " A");
+    $("#tritium_current").html(data.tritium_current + " A");
+    $("#tritium_volt").html(data.tritium_volt + " V");
+    $("#battery_volt").html(data.battery_volt + " V");
     $("#last_updated").html(data.time);
     if (data.connected) {
       $("#last_updated").removeClass('red');
