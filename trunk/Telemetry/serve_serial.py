@@ -18,10 +18,7 @@ class RemoteSerialClient(object):
         if self.buffer:
             sent = self.socket.send(self.buffer[:WRITE_CHUNK_SIZE])
             if sent:
-                print "I sent some data: ", self.buffer[:sent]
                 self.buffer = self.buffer[sent:]
-            else:
-                print "I tried to send some data, but failed"
 
     def push(self, data):
         self.buffer += data
@@ -229,8 +226,6 @@ class SerialServer(object):
                 #Do level checking to see which sockets to service
                 connections_waiting, writeable = get_ready_io()
 
-                if not writeable:
-                    print "Nobody available to write"
                 #Push data to clients
                 for fd in writeable:
                     client = self.clients[fd]
@@ -259,8 +254,6 @@ class SerialServer(object):
                 if data_waiting and not self.shutting_down:
                     try:
                         data = self.read_serial_data()
-                        if data:
-                            print "Got data:", data
                     except serial.SerialException:
                         #If the serial port breaks, stop accepting clients,
                         #flush existing data
