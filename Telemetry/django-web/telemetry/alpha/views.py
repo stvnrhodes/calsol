@@ -78,7 +78,7 @@ def car_json(request, car_id):
   if geo_packets:
     response['lat'] = geo_packets[0].lat
     response['lng'] = geo_packets[0].lng
-    response['gps_speed'] = geo_packets[0].gps_speed
+    response['gps_speed'] = '%0.3f' % (geo_packets[0].gps_speed or 0.0)
   else:
     response['lat'] = None
     response['lng'] = None
