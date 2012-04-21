@@ -86,26 +86,56 @@ google.maps.event.addDomListener(window, 'load', initialize);
 <div class="row">
   <div class="span3">
     <ul class="nav nav-tabs nav-stacked">
-      <li>
-        Amps: 
-        <span id="power">
+      <li><a href="#">
+        Array Current: 
+        <span id="array_current">
           {% if data_packets.0 %}
-            {{data_packets.0.power}} A
+            {{data_packets.0.array_current}} A
           {% else %}
             N/A
           {% endif %}
         </span>
-      </li>
-      <li>
-        Volts: 
-        <span id="volts">
+      </a></li>
+      <li><a href="#">
+        Motor Current: 
+        <span id="motor_current">
+          {% if data_packets.0 %}
+            {{data_packets.0.motor_current}} A
+          {% else %}
+            N/A
+          {% endif %}
+        </span>
+      </a></li>
+      <li><a href="#">
+        Tritium Current: 
+        <span id="tritium_current">
+          {% if data_packets.0 %}
+            {{data_packets.0.tritium_current}} A
+          {% else %}
+            N/A
+          {% endif %}
+        </span>
+      </a></li>
+      <li><a href="#">
+        Battery volts: 
+        <span id="battery_volts">
           {% if data_packets.0 %}
             {{data_packets.0.battery_volt}} V
           {% else %}
             N/A
           {% endif %}
         </span>
-      </li>
+      </a></li>
+      <li><a href="#">
+        Tritium volts: 
+        <span id="tritium_volts">
+          {% if data_packets.0 %}
+            {{data_packets.0.tritium_volt}} V
+          {% else %}
+            N/A
+          {% endif %}
+        </span>
+      </a></li>
     </ul>
   </div>
   <div class="span9">
