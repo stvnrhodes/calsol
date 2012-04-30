@@ -169,7 +169,7 @@ float adjustCruiseControl(float speed) {
  */
 // TODO: Hazard latching
 void updateAuxiliaryStates() {
-  if (!digitalRead(IN_HAZ_SWITCH) || status != OKAY_STATUS) {
+  if (!digitalRead(IN_HAZ_SWITCH)){// || status != OKAY_STATUS) {
     // Hazard lights blink if Haz switch is on, or if the car is not okay.
     if (!hazard_state) {
       // If this state is off...
