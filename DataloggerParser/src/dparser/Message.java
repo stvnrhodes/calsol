@@ -47,7 +47,7 @@ public abstract class Message {
 	 * the parser in the matrix of data, and the human-readable
 	 * name of the parameter being parsed.
 	 */
-	protected String header = null;
+	protected ArrayList<String> header = new ArrayList<String>();
 	
 	/**
 	 * This is analagous to the payload in the datalogger
@@ -91,14 +91,14 @@ public abstract class Message {
 	 * @return The human-readable <b>header</b> field.
 	 * This is basically the column header.
 	 */
-	public String getHeader() {
+	public ArrayList<String> getHeader() {
 		return header;
 	}
 	/**
 	 * @param s : The String that the header is to be 
 	 * set equal to.
 	 */
-	public void setHeader(String s) {
+	public void setHeader(ArrayList<String> s) {
 		header = s;
 	}
 	

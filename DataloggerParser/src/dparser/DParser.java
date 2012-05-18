@@ -58,7 +58,8 @@ public class DParser {
 	/**
 	 * Writes the parsed data into .csv and .txt files. The configuration,
 	 * firmware, and datalogger version info will be in a .txt file named 
-	 * "(dataloggerfilename)cfg.txt"
+	 * "(dataloggerfilename)cfg.txt" This method makes use of opencsv for 
+	 * csv writing.
 	 * @param file : The original file that was opened for parsing - needed
 	 * to get the name of the file.
 	 */
