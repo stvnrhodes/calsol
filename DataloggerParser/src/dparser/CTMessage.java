@@ -2,6 +2,12 @@ package dparser;
 
 import java.util.ArrayList;
 
+/**
+ * This is a CAN Transmit message. It is usually some
+ * sort of error from CAN.
+ * @author Derek Chou
+ * @since 2012.05.16
+ */
 public class CTMessage extends Message {
 	
 	public CTMessage(String [] info, boolean ts) {

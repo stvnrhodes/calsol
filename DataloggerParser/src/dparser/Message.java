@@ -9,7 +9,7 @@ import java.util.ArrayList;
  * handles that ambiguity. It is extended by the various types
  * of message classes.
  * @author Derek Chou
- * @since 2012.05.14
+ * @since 2012.05.15
  */
 public abstract class Message {
 	
@@ -32,14 +32,14 @@ public abstract class Message {
 	 * the timestamp error. <br>
 	 * Defaults to null if there is no timestamp.
 	 */
-	protected Integer timestamp = null;
+	protected Double timestamp = null;
 	
 	/**
 	 * This String is set to whatever the timestamp error
 	 * of the Message is, if there is one.<br>
 	 * Defaults to null if there is no timestamp.
 	 */
-	protected Integer tsError = null;
+	protected Double tsError = null;
 	
 	/**
 	 * All Messages *should* have a header, but this may not be
@@ -55,6 +55,19 @@ public abstract class Message {
 	 */
 	protected ArrayList<String> data = null;
 	
+	/**
+	 * This is the timebase that is currently being used with the 
+	 * datalogger. It is sure to change once the PRM messages
+	 * are actually of use.
+	 */
+	protected double time = 1.0/1024;
+	
+	/**
+	 * This is the voltbase that is currently being used with the 
+	 * datalogger. It is sure to change once the PRM messages are
+	 * actually of use.
+	 */
+	protected double vBase = 1.0/1024;
 	
 	/**
 	 * Sets up a new Message. The constructor first determines whether
@@ -93,7 +106,7 @@ public abstract class Message {
 	 * @return The timestamp of the message, if it exists.
 	 * Otherwise, it returns <b>null</b>
 	 */
-	public Integer getTimestamp() {
+	public Double getTimestamp() {
 		if (timestamped)
 		    return timestamp;
 		else
@@ -107,11 +120,11 @@ public abstract class Message {
 	public void setTimestamp(String s) {
 		if (timestamped)
 			if (s.indexOf('/') != -1) {
-			    timestamp = Integer.parseInt(s.substring(0,s.indexOf('/')), 16);
-			    tsError = Integer.parseInt(s.substring(s.indexOf('/')+1),16);
+			    timestamp = time * Integer.parseInt(s.substring(0,s.indexOf('/')), 16);
+			    tsError = time * Integer.parseInt(s.substring(s.indexOf('/')+1),16);
 		    }
 			else {
-				timestamp = Integer.parseInt(s, 16);
+				timestamp = time * Integer.parseInt(s, 16);
 			}
 		else
 			return;

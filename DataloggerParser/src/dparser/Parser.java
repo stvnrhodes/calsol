@@ -8,19 +8,37 @@ import java.util.ArrayList;
  * interpreting the datalogger signals. It deciphers the 
  * datalogger opCode first and then interprets the payload.
  * @author Derek Chou
- * @since 2012.05.12
+ * @since 2012.05.13
  * @version 1.00
  */
 public class Parser {
 	
+	/**
+	 * An ArrayList of all timestamped non-error data, be it accelerometer data,
+	 * CAN messages, etc.
+	 */
 	private static ArrayList<Message> data = new ArrayList<Message>();
 	
+	/**
+	 * An ArrayList of SD card information and other configuration things.
+	 */
 	private static ArrayList<Message> cfg = new ArrayList<Message>();
 	
+	/**
+	 * An ArrayList of all error messages logged by the datalogger in the .dla file.
+	 */
 	private static ArrayList<Message> errors = new ArrayList<Message>();
 	
+	/**
+	 * Contains the headers for the <b>matrix</b> ArrayList of ArrayLists so 
+	 * that it is easy to locate the correct ArrayList in the matrix.
+	 */
 	private static ArrayList<String> matrixIndex = new ArrayList<String>();
 	
+	/**
+	 * This contains sorted data; basically a message-type determined matrix of 
+	 * timestamped non-error data.
+	 */
 	private static ArrayList<ArrayList<Message>> matrix = 
 			new ArrayList<ArrayList<Message>>();
 	
@@ -41,9 +59,6 @@ public class Parser {
 	
 	private String voltBase = "";
 	*/
-	
-	private double time = 1.0/1024;
-	private double vBase = 1.0/1024;
 	
 	
 	/**
@@ -105,6 +120,12 @@ public class Parser {
 	}
 	*/
 	
+	/**
+	 * Parses the datalogger output into more intelligible
+	 * things. Where the data goes or which ArrayList it's added
+	 * into is dependent on its opCode and payload.
+	 * @param data : A line of datalogger output.
+	 */
 	public void parse(String data) {
 		String [] sp = data.split(" ");
 		int opCode = code.valueOf(sp[0]).num;
@@ -168,6 +189,8 @@ public class Parser {
 	}
 	
 	/**
+	 * Finds the index that a piece of data should be 
+	 * added to in the <b>matrix</b> ArrayList.
 	 * @param header : The header of the Message that
 	 * the method is using to find the 
 	 * @return The index at which the specified header exists.
@@ -178,6 +201,7 @@ public class Parser {
 	}
 	
 	/**
+	 * Adds a piece of non-error data to the ArrayList <b>matrix</b>.
 	 * @param temp : The message to be added to the large matrix of data
 	 */
 	private void addToMatrix(Message temp) {

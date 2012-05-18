@@ -12,7 +12,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 /**
  * Parser written for the CalSol datalogger
  * @author Derek Chou
- * @since 2012.05.12
+ * @since 2012.05.13
  * @version 1.00
  */
 
