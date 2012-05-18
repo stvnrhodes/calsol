@@ -33,7 +33,7 @@ public class Parser {
 	 * Contains the headers for the <b>matrix</b> ArrayList of ArrayLists so 
 	 * that it is easy to locate the correct ArrayList in the matrix.
 	 */
-	private static ArrayList<String> matrixIndex = new ArrayList<String>();
+	private static ArrayList<ArrayList<String>> matrixIndex = new ArrayList<ArrayList<String>>();
 	
 	/**
 	 * This contains sorted data; basically a message-type determined matrix of 
@@ -196,7 +196,7 @@ public class Parser {
 	 * @return The index at which the specified header exists.
 	 * -1 if the header does not exist.
 	 */
-	private int findIndex(String header) {
+	private int findIndex(ArrayList<String> header) {
 		return matrixIndex.indexOf(header);
 	}
 	
