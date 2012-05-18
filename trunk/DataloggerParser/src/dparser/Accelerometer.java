@@ -2,6 +2,14 @@ package dparser;
 
 import java.util.ArrayList;
 
+/**
+ * This is a type of Message that accepts
+ * Accelerometer data. Its <b>data</b> field
+ * contains the X, Y, and Z params of the 
+ * accelerometer.
+ * @author Derek Chou
+ * @since 2012.05.15
+ */
 public class Accelerometer extends Message {
 
 	public Accelerometer(String [] info, boolean ts) {
