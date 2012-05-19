@@ -1,5 +1,7 @@
 package dparser;
 
+import java.util.ArrayList;
+
 /**
  * This is a message pertaining to the configs of the 
  * SD card. It contains SD card information as 
@@ -11,7 +13,7 @@ public class SDMessage extends Message {
 	
 	public SDMessage(String [] info, boolean ts) {
 		super(info,ts);
-		
+		data = new ArrayList<String>();
 	}
 
 }

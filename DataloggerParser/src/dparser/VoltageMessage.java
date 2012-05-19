@@ -1,5 +1,7 @@
 package dparser;
 
+import java.util.ArrayList;
+
 /**
  * This is a statistical voltage measurement message
  * from the datalogger. It includes in its data ArrayList
@@ -13,7 +15,9 @@ public class VoltageMessage extends Message {
 	public VoltageMessage(String [] info, boolean ts) {
 		super(info,ts);
 		header.add("Statistical Voltage Measurement");
-		
+		data = new ArrayList<String>();
+		for (int i = 2; i < info.length; i++)
+			data.add(info[i]);
 	}
 
 }

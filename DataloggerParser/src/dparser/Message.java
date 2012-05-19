@@ -60,14 +60,14 @@ public abstract class Message {
 	 * datalogger. It is sure to change once the PRM messages
 	 * are actually of use.
 	 */
-	protected double time = 1.0/1024;
+	protected Double time = 1.0/1024;
 	
 	/**
 	 * This is the voltbase that is currently being used with the 
 	 * datalogger. It is sure to change once the PRM messages are
 	 * actually of use.
 	 */
-	protected double vBase = 1.0/1024;
+	protected Double vBase = 1.0/1024;
 	
 	/**
 	 * Sets up a new Message. The constructor first determines whether
@@ -120,13 +120,34 @@ public abstract class Message {
 	public void setTimestamp(String s) {
 		if (timestamped)
 			if (s.indexOf('/') != -1) {
-			    timestamp = time * Integer.parseInt(s.substring(0,s.indexOf('/')), 16);
-			    tsError = time * Integer.parseInt(s.substring(s.indexOf('/')+1),16);
+			    timestamp = time * Integer.parseInt
+			    		(s.substring(0,s.indexOf('/')), 16);
+			    tsError = time * Integer.parseInt
+			    		(s.substring(s.indexOf('/')+1),16);
 		    }
 			else {
 				timestamp = time * Integer.parseInt(s, 16);
 			}
 		else
 			return;
+	}
+	
+	@Override
+	public String toString() {
+		String out = "";
+		if (timestamped) {
+			try {
+				out = timestamp.toString() + " ± " 
+						+ tsError.toString() + "\n";
+			} catch (NullPointerException e) {
+				out = timestamp.toString() + "\n";
+			} finally {
+				out += header.toString() + "\n" + data.toString();
+			}
+		}
+		else {
+			out += header.toString() + "\n" + data.toString();
+		}
+		return out;
 	}
 }

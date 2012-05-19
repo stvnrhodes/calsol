@@ -1,5 +1,7 @@
 package dparser;
 
+import java.util.ArrayList;
+
 /**
  * This is a message from CAN. This class implements the
  * JSON configuration files to decode what type of CAN
@@ -12,7 +14,7 @@ public class CANMessage extends Message {
 	public CANMessage(String [] info, boolean ts) {
 		super(info,ts);
 		isCAN = true;
-		
+		data = new ArrayList<String>();
 	}
 
 }

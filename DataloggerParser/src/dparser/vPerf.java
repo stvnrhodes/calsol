@@ -1,5 +1,7 @@
 package dparser;
 
+import java.util.ArrayList;
+
 /**
  * This is a "statistical performance measurement" as
  * documented by the Datalogger ASCII format specs.
@@ -16,6 +18,9 @@ public class vPerf extends Message {
 	public vPerf(String [] info, boolean ts) {
 		super(info,ts);
 		header.add("Statistical Voltage Performance");
+		data = new ArrayList<String>();
+		for (int i = 2; i < info.length; i++)
+			data.add(info[i]);
 	}
 
 }

@@ -28,7 +28,7 @@ public class DParser {
 	 * @param args : Main class; args is unused.
 	 */
 	public static void main(String[] args) {
-		
+		p.setVerbose(true);
 		while (true) {
 			JFileChooser fd = new JFileChooser(".");
 			FileFilter filter = new FileNameExtensionFilter(
