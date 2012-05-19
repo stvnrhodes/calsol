@@ -14,8 +14,14 @@ import java.util.ArrayList;
 public class Parser {
 	
 	/**
-	 * An ArrayList of all timestamped non-error data, be it accelerometer data,
-	 * CAN messages, etc.
+	 * Tells whether we want to output the ArrayLists stored inside 
+	 * each message. Defaults to false.
+	 */
+	private boolean debug = false;
+	
+	/**
+	 * An ArrayList of all timestamped non-error data, be it accelerometer 
+	 * data, CAN messages, etc.
 	 */
 	private static ArrayList<Message> data = new ArrayList<Message>();
 	
@@ -25,7 +31,8 @@ public class Parser {
 	private static ArrayList<Message> cfg = new ArrayList<Message>();
 	
 	/**
-	 * An ArrayList of all error messages logged by the datalogger in the .dla file.
+	 * An ArrayList of all error messages logged by the datalogger in the 
+	 * .dla file.
 	 */
 	private static ArrayList<Message> errors = new ArrayList<Message>();
 	
@@ -33,10 +40,11 @@ public class Parser {
 	 * Contains the headers for the <b>matrix</b> ArrayList of ArrayLists so 
 	 * that it is easy to locate the correct ArrayList in the matrix.
 	 */
-	private static ArrayList<ArrayList<String>> matrixIndex = new ArrayList<ArrayList<String>>();
+	private static ArrayList<ArrayList<String>> matrixIndex = 
+			new ArrayList<ArrayList<String>>();
 	
 	/**
-	 * This contains sorted data; basically a message-type determined matrix of 
+	 * This contains sorted data; basically a message-type determined matrix of
 	 * timestamped non-error data.
 	 */
 	private static ArrayList<ArrayList<Message>> matrix = 
@@ -129,7 +137,7 @@ public class Parser {
 	public void parse(String data) {
 		String [] sp = data.split(" ");
 		int opCode = code.valueOf(sp[0]).num;
-		Message temp;
+		Message temp = null;
 		switch (opCode) {
 		case 0:
 			temp = new Accelerometer(sp, true);
@@ -185,6 +193,13 @@ public class Parser {
 		default:
 			break;
 			
+		}
+		try {
+			if (debug) {
+				System.out.println(temp);
+		    }	
+		} catch(NullPointerException e) {
+			// Do absolutely nothing!			
 		}
 	}
 	
@@ -249,7 +264,15 @@ public class Parser {
 		}
 	}
 	*/
-
+	
+	public void setVerbose(boolean t) {
+		debug = t;
+	}
+	
+	public boolean getVerbose() {
+		return debug;
+	}
+	
 	@Override
 	public String toString() {
 		String out = "";
