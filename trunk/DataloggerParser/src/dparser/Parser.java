@@ -72,18 +72,18 @@ public class Parser {
 	/**
 	 * This enum contains the different opCodes that are specified
 	 * in the datalogger documentation.<br>
-	 * ACL = 0 <br>
-	 * BOVF = 1 <br>
-	 * CM = 2 <br>
-	 * COVF = 3 <br>
-	 * CRD = 4 <br>
-	 * PRM = 5 <br>
-	 * PWM = 5 <br>
-	 * MNT = 6 <br>
-	 * PS = 7 <br>
-	 * VS = 8 <br>
-	 * DM = 9 <br>
-	 * CT = 10 <br>
+	 * Accelerometer: <b>ACL = 0</b> <br>
+	 * Buffer Overflow: <b>BOVF = 1</b> <br>
+	 * CAN Message: <b>CM = 2</b> <br>
+	 * CAN Overflow: <b>COVF = 3</b> <br>
+	 * SD Card Information: <b>CRD = 4</b> <br>
+	 * Parameters: <b>PRM = 5</b> <br>
+	 * Parameters(typo): <b>PWM = 5</b> <br>
+	 * SD Card Mounted: <b>MNT = 6</b> <br>
+	 * Statistical Performance Measurement: <b>PS = 7</b> <br>
+	 * Statistical Voltage Measuremet: <b>VS = 8</b> <br>
+	 * SD Card Dismount: <b>DM = 9</b> <br>
+	 * CAN Transmit Error: <b>CT = 10</b> <br>
 	 */
 	private enum code {
 		ACL  (0),
@@ -131,7 +131,8 @@ public class Parser {
 	/**
 	 * Parses the datalogger output into more intelligible
 	 * things. Where the data goes or which ArrayList it's added
-	 * into is dependent on its opCode and payload.
+	 * into is dependent on its opCode and payload. This method
+	 * currently ignores PRM/PWM messages.
 	 * @param data : A line of datalogger output.
 	 */
 	public void parse(String data) {
@@ -199,7 +200,7 @@ public class Parser {
 				System.out.println(temp);
 		    }	
 		} catch(NullPointerException e) {
-			// Do absolutely nothing!			
+			/* Do absolutely nothing! */			
 		}
 	}
 	

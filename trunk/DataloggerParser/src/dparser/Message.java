@@ -27,7 +27,7 @@ public abstract class Message {
 	public boolean isCAN = false;
 	
 	/**
-	 * This String is set to whatever the timestamp of the
+	 * This Double is set to whatever the timestamp of the
 	 * Message is, if there is one. It does NOT contain
 	 * the timestamp error. <br>
 	 * Defaults to null if there is no timestamp.
@@ -35,11 +35,27 @@ public abstract class Message {
 	protected Double timestamp = null;
 	
 	/**
-	 * This String is set to whatever the timestamp error
+	 * While <b>timestamp</b> is a 
+	 * decimal number, timestampFrac is an Integer meant to 
+	 * represent the numerator over 1024. Defaults to null if
+	 * there is no timestamp error.
+	 */
+	protected Integer timestampFrac = null;
+	
+	/**
+	 * This Double is set to whatever the timestamp error
 	 * of the Message is, if there is one.<br>
 	 * Defaults to null if there is no timestamp.
 	 */
 	protected Double tsError = null;
+	
+	/**
+	 * While <b>tsError</b> is a decimal number,
+	 * tsErrorFrac is an Integer meant to represent the
+	 * numerator over 1024. Defaults to null if there is
+	 * no timestamp error.
+	 */
+	protected Integer tsErrorFrac = null;
 	
 	/**
 	 * All Messages *should* have a header, but this may not be
@@ -120,13 +136,16 @@ public abstract class Message {
 	public void setTimestamp(String s) {
 		if (timestamped)
 			if (s.indexOf('/') != -1) {
-			    timestamp = time * Integer.parseInt
+			    timestampFrac = Integer.parseInt
 			    		(s.substring(0,s.indexOf('/')), 16);
-			    tsError = time * Integer.parseInt
+			    tsErrorFrac = Integer.parseInt
 			    		(s.substring(s.indexOf('/')+1),16);
+			    timestamp = time * timestampFrac;
+			    tsError = time * tsErrorFrac;
 		    }
 			else {
-				timestamp = time * Integer.parseInt(s, 16);
+				timestampFrac = Integer.parseInt(s, 16);
+				timestamp = time * timestampFrac;
 			}
 		else
 			return;
@@ -137,10 +156,10 @@ public abstract class Message {
 		String out = "";
 		if (timestamped) {
 			try {
-				out = timestamp.toString() + " ± " 
+				out += timestamp.toString() + " ± " 
 						+ tsError.toString() + "\n";
 			} catch (NullPointerException e) {
-				out = timestamp.toString() + "\n";
+				out += timestamp.toString() + "\n";
 			} finally {
 				out += header.toString() + "\n" + data.toString();
 			}
