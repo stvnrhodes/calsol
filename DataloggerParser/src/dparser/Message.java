@@ -7,7 +7,7 @@ import java.util.ArrayList;
  * coming from the datalogger. All messages have an opcode,
  * possibly a timestamp, and maybe a payload. This class
  * handles that ambiguity. It is extended by the various types
- * of message classes.
+ * of message classes to handle the different opCodes.
  * @author Derek Chou
  * @since 2012.05.15
  */

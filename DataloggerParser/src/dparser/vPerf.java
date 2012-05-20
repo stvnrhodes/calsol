@@ -19,7 +19,11 @@ public class vPerf extends Message {
 		/* This is a little bit hard-coded, but then again,
 		 * this was the format given me.
 		 */
-		
+		header.add("Channel ID");
+		header.add("Samples");
+		header.add("Min");
+		header.add("Avg");
+		header.add("Max");
 		data = new ArrayList<String>();
 		for (int i = 2; i < info.length; i++)
 			data.add(info[i]);
