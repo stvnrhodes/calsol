@@ -1,6 +1,10 @@
 package dparser;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Scanner;
 
 /**
  * Parser written for the CalSol datalogger
@@ -129,6 +133,23 @@ public class Parser {
 	*/
 	
 	/**
+	 * Initializes the directory where the JSON files are kept,
+	 * so that the Parser may decode CAN Message payloads when 
+	 * needed.
+	 * @throws FileNotFoundException : If the Scanner cannot
+	 * read the JSON files needed to decode the CAN Messages.
+	 */
+	public Parser() throws FileNotFoundException {
+		File batteries = new File("CFG\\batteries.can.json");
+		File cutoff = new File("CFG\\cutoff.can.json");
+		File dashboard = new File("CFG\\dashboard.can.json");
+		File mppts = new File("CFG\\mppts.can.json");
+		File tritium = new File("CFG\\tritium.can.json");
+		Scanner read = new Scanner(batteries);
+	}
+	
+	
+	/**
 	 * Parses the datalogger output into more intelligible
 	 * things. Where the data goes or which ArrayList it's added
 	 * into is dependent on its opCode and payload. This method
@@ -148,10 +169,16 @@ public class Parser {
 			errors.add(new BOverflow(sp, true));
 			break;
 		case 2:
-			temp = new CANMessage(sp, true);
-			if (sp[2].equalsIgnoreCase("covf")) {
+			boolean isError = false;
+			if (sp[2].equalsIgnoreCase("covf"))
+				isError = true;
+			if (isError) {
+				temp = new CANMessage(sp, true);
 				errors.add(temp);
 				break;
+			} else {
+				decode(sp[sp.length-1]);
+				temp = new CANMessage(sp, true);
 			}
 			addToMatrix(temp);
 			break;
@@ -204,6 +231,16 @@ public class Parser {
 		}
 	}
 	
+	/**
+	 * Decodes a CAN Message using JSON libraries. This method 
+	 * implements some pre-made JSON decoders, imported.
+	 * @param payload : The payload incoming from a CAN Message.
+	 */
+	private void decode(String payload) {
+		// TODO Auto-generated method stub
+		
+	}
+
 	/**
 	 * Finds the index that a piece of data should be 
 	 * added to in the <b>matrix</b> ArrayList.

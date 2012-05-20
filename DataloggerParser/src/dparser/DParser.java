@@ -2,6 +2,7 @@ package dparser;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Scanner;
 
@@ -22,12 +23,24 @@ public class DParser {
 	 * The parser object that this class uses to parse the datalogger
 	 * lines.
 	 */
-	private static Parser p = new Parser();
+	private static Parser p;
 	
 	/**
+	 * Creates a Parser object, and also prompts the user for a .dla
+	 * file location. Then it attempts to parse the file
+	 * and then output. This method fails to execute if the Parser 
+	 * object cannot locate where the JSON files for the CAN Message
+	 * decoder are. It also fails if the parser cannot read the input 
+	 * file.
 	 * @param args : Main class; args is unused.
 	 */
 	public static void main(String[] args) {
+		try {
+			p = new Parser();
+		} catch(FileNotFoundException e) {
+			e.printStackTrace();
+			return;
+		}
 		p.setVerbose(true);
 		while (true) {
 			JFileChooser fd = new JFileChooser(".");
@@ -44,7 +57,7 @@ public class DParser {
 					}
 					writeFiles(file);
 				} catch (FileNotFoundException e) {
-					// Do nothing!
+					/*Do nothing!*/
 					e.printStackTrace();
 				}
 			}
