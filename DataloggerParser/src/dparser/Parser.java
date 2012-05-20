@@ -5,8 +5,8 @@ import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Scanner;
 
+import org.json.JSONArray;
 import org.json.JSONException;
-import org.json.JSONML;
 import org.json.JSONObject;
 
 /**
@@ -153,7 +153,7 @@ public class Parser {
 		just coding each of the json files in...
 		*/
 		Scanner r;
-		String f = "";
+
 		File [] json = {
 				new File("CFG\\batteries.can.json"),
 			    new File("CFG\\cutoff.can.json"),
@@ -162,11 +162,12 @@ public class Parser {
 			    new File("CFG\\tritium.can.json")
 			    };
 		for (int i = 0; i < json.length; i++) {
+			String f = "";
 			r = new Scanner(json[i]);
 			while(r.hasNext()) {
 				f += "\n" + r.nextLine();
 			}
-			decoder.add(JSONML.toJSONObject(f));
+			decoder.add(new JSONObject(f));
 		}
 	}
 	
@@ -195,12 +196,13 @@ public class Parser {
 			if (sp[2].equalsIgnoreCase("covf"))
 				isError = true;
 			if (isError) {
-				temp = new CANMessage(sp, true);
+				temp = new CANMessage(sp, true, isError);
 				errors.add(temp);
 				break;
 			} else {
-				decode(sp[sp.length-1]);
-				temp = new CANMessage(sp, true);
+				ArrayList<String> h = decode(sp[5]);
+				temp = new CANMessage(sp, true, isError);
+				temp.setHeader(null);
 			}
 			addToMatrix(temp);
 			break;
@@ -258,9 +260,18 @@ public class Parser {
 	 * implements some pre-made JSON decoders, imported.
 	 * @param payload : The payload incoming from a CAN Message.
 	 */
-	private void decode(String payload) {
-		// TODO Auto-generated method stub
-		
+	private ArrayList<String> decode(String payload) {
+		JSONArray A = null;
+		ArrayList<String> h = new ArrayList<String>();
+		for (int i = 0; i < decoder.size(); i++) {
+			if(decoder.get(i).has(payload))
+				try {
+					A = decoder.get(i).getJSONArray(payload);
+				} catch (JSONException e) {
+					e.printStackTrace();
+				}
+		}
+		return h;
 	}
 
 	/**
