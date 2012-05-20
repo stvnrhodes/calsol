@@ -173,7 +173,8 @@ public class Parser {
 			break;
 		*/
 		case 6:
-			cfg.add(new SDMount(sp, true));
+			temp = new SDMount(sp, true);
+			addToMatrix(temp);
 			break;
 		case 7:
 			temp = new vPerf(sp, true);
