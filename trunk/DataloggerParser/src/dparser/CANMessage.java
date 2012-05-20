@@ -10,10 +10,16 @@ import java.util.ArrayList;
  */
 public class CANMessage extends Message {
 	
-	public CANMessage(String [] info, boolean ts) {
+	public CANMessage(String [] info, boolean ts, boolean error) {
 		super(info,ts);
 		isCAN = true;
+		if (error) 
+			return;
 		data = new ArrayList<String>();
+		String [] payload = info[info.length-1].split(",");
+		for (String s : payload) {
+			data.add(new Integer(Integer.parseInt(s,16)).toString());
+		}
 	}
 
 }
