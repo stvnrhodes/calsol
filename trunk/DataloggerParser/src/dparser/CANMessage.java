@@ -1,7 +1,6 @@
 package dparser;
 
 import java.util.ArrayList;
-
 /**
  * This is a message from CAN. This class implements the
  * JSON configuration files to decode what type of CAN
