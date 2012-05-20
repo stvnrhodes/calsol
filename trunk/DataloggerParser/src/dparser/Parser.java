@@ -14,8 +14,8 @@ import java.util.ArrayList;
 public class Parser {
 	
 	/**
-	 * Tells whether we want to output the ArrayLists stored inside 
-	 * each message. Defaults to false.
+	 * Tells whether we want to output the ArrayLists' toString()s stored 
+	 * inside each message. Defaults to false.
 	 */
 	private boolean debug = false;
 	
@@ -32,7 +32,7 @@ public class Parser {
 	
 	/**
 	 * An ArrayList of all error messages logged by the datalogger in the 
-	 * .dla file.
+	 * .dla file. This includes BOVF and COVF messages.
 	 */
 	private static ArrayList<Message> errors = new ArrayList<Message>();
 	
@@ -173,8 +173,7 @@ public class Parser {
 			break;
 		*/
 		case 6:
-			temp = new SDMount(sp, true);
-			addToMatrix(temp);
+			cfg.add(new SDMount(sp, true));
 			break;
 		case 7:
 			temp = new vPerf(sp, true);
