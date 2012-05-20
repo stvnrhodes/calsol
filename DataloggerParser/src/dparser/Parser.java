@@ -2,9 +2,12 @@ package dparser;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Scanner;
+
+import org.json.JSONException;
+import org.json.JSONML;
+import org.json.JSONObject;
 
 /**
  * Parser written for the CalSol datalogger
@@ -22,6 +25,11 @@ public class Parser {
 	 * inside each message. Defaults to false.
 	 */
 	private boolean debug = false;
+	
+	/**
+	 * An ArrayList of all JSON Objects created from initializing the Parser.
+	 */
+	private static ArrayList<JSONObject> decoder = new ArrayList<JSONObject>();
 	
 	/**
 	 * An ArrayList of all timestamped non-error data, be it accelerometer 
@@ -133,19 +141,33 @@ public class Parser {
 	*/
 	
 	/**
-	 * Initializes the directory where the JSON files are kept,
-	 * so that the Parser may decode CAN Message payloads when 
-	 * needed.
+	 * Initializes the directory and files where the JSON 
+	 * files are kept, so that the Parser may decode CAN 
+	 * Message payloads when needed.
 	 * @throws FileNotFoundException : If the Scanner cannot
 	 * read the JSON files needed to decode the CAN Messages.
 	 */
-	public Parser() throws FileNotFoundException {
-		File batteries = new File("CFG\\batteries.can.json");
-		File cutoff = new File("CFG\\cutoff.can.json");
-		File dashboard = new File("CFG\\dashboard.can.json");
-		File mppts = new File("CFG\\mppts.can.json");
-		File tritium = new File("CFG\\tritium.can.json");
-		Scanner read = new Scanner(batteries);
+	public Parser() throws FileNotFoundException, JSONException {
+		/*
+		I suppose there's not another way to do this other than
+		just coding each of the json files in...
+		*/
+		Scanner r;
+		String f = "";
+		File [] json = {
+				new File("CFG\\batteries.can.json"),
+			    new File("CFG\\cutoff.can.json"),
+			    new File("CFG\\dashboard.can.json"),
+			    new File("CFG\\mppts.can.json"),
+			    new File("CFG\\tritium.can.json")
+			    };
+		for (int i = 0; i < json.length; i++) {
+			r = new Scanner(json[i]);
+			while(r.hasNext()) {
+				f += "\n" + r.nextLine();
+			}
+			decoder.add(JSONML.toJSONObject(f));
+		}
 	}
 	
 	

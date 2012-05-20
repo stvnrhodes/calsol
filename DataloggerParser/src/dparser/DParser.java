@@ -2,13 +2,14 @@ package dparser;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Scanner;
 
 import javax.swing.JFileChooser;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileNameExtensionFilter;
+
+import org.json.JSONException;
 
 /**
  * Parser written for the CalSol datalogger
@@ -38,6 +39,9 @@ public class DParser {
 		try {
 			p = new Parser();
 		} catch(FileNotFoundException e) {
+			e.printStackTrace();
+			return;
+		} catch (JSONException e) {
 			e.printStackTrace();
 			return;
 		}
