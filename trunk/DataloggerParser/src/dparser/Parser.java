@@ -193,16 +193,15 @@ public class Parser {
 			break;
 		case 2:
 			boolean isError = false;
-			if (sp[2].equalsIgnoreCase("covf"))
+			if (sp[2].equalsIgnoreCase("covf")) {
 				isError = true;
-			if (isError) {
 				temp = new CANMessage(sp, true, isError);
 				errors.add(temp);
 				break;
 			} else {
-				ArrayList<String> h = decode(sp[5]);
+				ArrayList<String> h = decode(sp);
 				temp = new CANMessage(sp, true, isError);
-				temp.setHeader(null);
+				temp.setHeader(h);
 			}
 			addToMatrix(temp);
 			break;
@@ -247,7 +246,7 @@ public class Parser {
 			
 		}
 		try {
-			if (debug) {
+			if (debug && temp != null) {
 				System.out.println(temp);
 		    }	
 		} catch(NullPointerException e) {
@@ -257,18 +256,33 @@ public class Parser {
 	
 	/**
 	 * Decodes a CAN Message using JSON libraries. This method 
-	 * implements some pre-made JSON decoders, imported.
-	 * @param payload : The payload incoming from a CAN Message.
+	 * implements some pre-made JSON decoders, imported. This triple
+	 * for loop is there because someone decided to put values inside
+	 * values for the JSON files.
+	 * @param sp : The payload incoming from a CAN Message.
 	 */
-	private ArrayList<String> decode(String payload) {
-		JSONArray A = null;
+	private ArrayList<String> decode(String[] sp) {
+		JSONObject A = null;
 		ArrayList<String> h = new ArrayList<String>();
 		for (int i = 0; i < decoder.size(); i++) {
-			if(decoder.get(i).has(payload))
+			if(decoder.get(i).has("0x" + sp[5]))
 				try {
-					A = decoder.get(i).getJSONArray(payload);
+					A = decoder.get(i).getJSONObject("0x" + sp[5]);
+					try {
+						h.add(A.getString("name"));
+					} catch (JSONException e) {
+						/* Do nothing! */
+					}
+					JSONArray B = A.getJSONArray("messages");
+					for (int j = 0; j < B.length(); j++) {
+						JSONArray C = B.getJSONArray(j);
+						for (int k = 0; k < C.length(); k++) {
+							h.add(C.getString(k));
+						}
+					}
+					return h;
 				} catch (JSONException e) {
-					e.printStackTrace();
+					/* Do nothing! */
 				}
 		}
 		return h;

@@ -55,6 +55,8 @@ public class JSONTester {
 					System.out.println(c.getString(j));
 					System.out.println(d.getString(j));
 				}
+				String e = a.getString("name");
+				System.out.println(e);
 			} catch (JSONException e) {
 				/* Do nothing! */
 			}
