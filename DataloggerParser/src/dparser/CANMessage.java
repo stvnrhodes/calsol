@@ -13,7 +13,7 @@ public class CANMessage extends Message {
 	public CANMessage(String [] info, boolean ts, boolean error) {
 		super(info,ts);
 		isCAN = true;
-		if (error) 
+		if (error)
 			return;
 		data = new ArrayList<String>();
 		String [] payload = info[info.length-1].split(",");
