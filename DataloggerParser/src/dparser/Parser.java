@@ -235,7 +235,7 @@ public class Parser {
 			addToMatrix(temp);
 			break;
 		case 9:
-			temp = new dismountMessage(sp, true);
+			temp = new DismountMessage(sp, true);
 			addToMatrix(temp);
 			break;
 		case 10:
@@ -276,9 +276,11 @@ public class Parser {
 					JSONArray B = A.getJSONArray("messages");
 					for (int j = 0; j < B.length(); j++) {
 						JSONArray C = B.getJSONArray(j);
+						String message = "";
 						for (int k = 0; k < C.length(); k++) {
-							h.add(C.getString(k));
+							message += " " + C.getString(k);
 						}
+						h.add(message);
 					}
 					return h;
 				} catch (JSONException e) {

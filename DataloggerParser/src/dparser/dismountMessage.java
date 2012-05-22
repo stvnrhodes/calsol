@@ -7,9 +7,9 @@ package dparser;
  * @author Derek Chou
  * @since 2012.05.15
  */
-public class dismountMessage extends Message {
+public class DismountMessage extends Message {
 	
-	public dismountMessage(String [] info, boolean ts) {
+	public DismountMessage(String [] info, boolean ts) {
 		super(info,ts);
 		header.add("SD Card Dismounted");
 	}
