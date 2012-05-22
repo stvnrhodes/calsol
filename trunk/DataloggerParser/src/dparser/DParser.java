@@ -59,7 +59,7 @@ public class DParser {
 					while (f.hasNext()) {
 						p.parse(f.nextLine());
 					}
-					writeFiles(file);
+					/*writeFiles(file);*/
 				} catch (FileNotFoundException e) {
 					/*Do nothing!*/
 					e.printStackTrace();
