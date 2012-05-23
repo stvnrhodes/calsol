@@ -199,7 +199,7 @@ public class Parser {
 				errors.add(temp);
 				break;
 			} else {
-				ArrayList<String> h = decode(sp);
+				ArrayList<String> h = decodeJSON(sp);
 				try {
 					String format = h.remove(h.size()-1);
 					temp = new CANMessage(sp, true, isError, format);
@@ -269,7 +269,7 @@ public class Parser {
 	 * values for the JSON files.
 	 * @param sp : The payload incoming from a CAN Message.
 	 */
-	private ArrayList<String> decode(String[] sp) {
+	private ArrayList<String> decodeJSON(String[] sp) {
 		JSONObject A = null;
 		ArrayList<String> h = new ArrayList<String>();
 		for (int i = 0; i < decoder.size(); i++) {

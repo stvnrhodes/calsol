@@ -16,10 +16,12 @@ public class CANMessage extends Message {
 		isCAN = true;
 		if (error)
 			return;
+		if (format == null)
+			return;
 		data = new ArrayList<String>();
 		try {
 		    ArrayList<Object> payload = 
-				    decode(info[info.length-1].split(","), format);
+				    decodeBytes(info[info.length-1].split(","), format);
 		    for (Object f : payload) {
 			    data.add(f.toString());
 	        }
@@ -111,7 +113,7 @@ public class CANMessage extends Message {
 	 * @throws NullPointerException If one of the objects referenced
 	 * somehow becomes null.
 	 */
-	private ArrayList<Object> decode(String [] bytes, String format) 
+	private ArrayList<Object> decodeBytes(String [] bytes, String format) 
 			throws IndexOutOfBoundsException, NullPointerException {
 		String lng = "";
 		ArrayList<Object> out = new ArrayList<Object>();
@@ -133,7 +135,7 @@ public class CANMessage extends Message {
 			case 'f':
 				for (int i = 1; i <= 4; i++, index++)
 					lng += bytes[index];
-				out.add(Float.intBitsToFloat((int) Long.parseLong(lng, 16)));
+				out.add(floatDecode(Long.parseLong(lng, 16)));
 				lng = "";
 				break;
 			case '1':
@@ -164,5 +166,10 @@ public class CANMessage extends Message {
 			}
 		}
 		return out;
+	}
+
+	private Float floatDecode(Long bits) {
+		bits.byteValue();
+		return null;
 	}
 }
