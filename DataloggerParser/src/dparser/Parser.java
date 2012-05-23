@@ -195,13 +195,21 @@ public class Parser {
 			boolean isError = false;
 			if (sp[2].equalsIgnoreCase("covf")) {
 				isError = true;
-				temp = new CANMessage(sp, true, isError);
+				temp = new CANMessage(sp, true, isError, null);
 				errors.add(temp);
 				break;
 			} else {
 				ArrayList<String> h = decode(sp);
-				temp = new CANMessage(sp, true, isError);
-				temp.setHeader(h);
+				try {
+					String format = h.remove(h.size()-1);
+					temp = new CANMessage(sp, true, isError, format);
+					temp.setHeader(h);
+				} catch (IndexOutOfBoundsException e) {
+					temp = new CANMessage(sp, true, isError, null);
+					ArrayList<String> tempList = new ArrayList<String>();
+					tempList.add("Unknown CAN Message");
+					temp.setHeader(tempList);
+				}
 			}
 			addToMatrix(temp);
 			break;
@@ -282,6 +290,7 @@ public class Parser {
 						}
 						h.add(message);
 					}
+					h.add(A.getString("format"));
 					return h;
 				} catch (JSONException e) {
 					/* Do nothing! */
