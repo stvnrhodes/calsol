@@ -2,6 +2,7 @@ package dparser;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Scanner;
 
@@ -61,6 +62,13 @@ public class Parser {
 	 */
 	private static ArrayList<ArrayList<Message>> matrix = 
 			new ArrayList<ArrayList<Message>>();
+	
+	/**
+	 * If debug is set to <b>true</b>, then this printstream will be
+	 * initialized. Otherwise, it will not.
+	 */
+	private PrintStream db;
+	
 	
 	/*
 	private int CANChannel;
@@ -256,6 +264,7 @@ public class Parser {
 		try {
 			if (debug && temp != null) {
 				System.out.println(temp);
+				db.println(temp);
 		    }	
 		} catch(NullPointerException e) {
 			/* Do absolutely nothing! */			
@@ -361,8 +370,9 @@ public class Parser {
 	}
 	*/
 	
-	public void setVerbose(boolean t) {
+	public void setVerbose(boolean t) throws FileNotFoundException {
 		debug = t;
+		db = new PrintStream(new File("Debug.txt"));
 	}
 	
 	public boolean getVerbose() {

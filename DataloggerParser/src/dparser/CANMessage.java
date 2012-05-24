@@ -20,16 +20,22 @@ public class CANMessage extends Message {
 			return;
 		data = new ArrayList<String>();
 		try {
-		    ArrayList<Object> payload = 
+		    ArrayList<String> payload = 
 				    decodeBytes(info[info.length-1].split(","), format);
-		    for (Object f : payload) {
-			    data.add(f.toString());
+		    for (String f : payload) {
+			    data.add(f);
 	        }
 		} catch (IndexOutOfBoundsException e) {
 			data.add("Error decoding payload");
+			e.printStackTrace();
 			return;
 		} catch (NullPointerException e) {
 			data.add("Error decoding payload");
+			e.printStackTrace();
+			return;
+		} catch (DecodeException e) {
+			data.add("Error decoding payload");
+			e.printStackTrace();
 			return;
 		}
 	}
@@ -39,14 +45,13 @@ public class CANMessage extends Message {
 	 * into values. This uses the format found on
 	 * <a href = "http://docs.python.org/py3k/library/struct.html">
 	 * http://docs.python.org/py3k/library/struct.html</a>
-	 * The ArrayList of Objects is meant to hold Strings and Numbers.
-	 * It might be changed into an ArrayList of Strings since the 
-	 * output will still be equivalent.
 	 * @param bytes : Input payload of bytes to be converted to values.
+	 * The endianness on x86 machines is "little", so the chunks of 
+	 * bytes read must be reversed before they are of any use.
 	 * @param format : The format used to decode the String array. <br>
 	 * x, s, p, and P require a number preceding them to designate
 	 * the number of bytes allocated to them.
-	 * As of 2012.05.22, only x, B, H, f, and s are implemented.
+	 * As of 2012.05.22, only x, B, H, f, L, and s are implemented.
 	 * <table>
 	 * <tr><td>Code</td><td>C Type</td><td>Python Type</td>
 	 * <td>Size(Bytes)</td>
@@ -106,54 +111,70 @@ public class CANMessage extends Message {
 	 * <td></td></tr>
 	 * 
 	 * </table>
-	 * @return An ArrayList of Objects, decoded from the array of
-	 * bytes.
+	 * @return An ArrayList of Strings, decoded from the array of
+	 * bytes. These represent the numerical values of the bytes.
 	 * @throws IndexOutOfBoundsException If the array decoding somehow
 	 * reaches an end of a list unexpectedly
 	 * @throws NullPointerException If one of the objects referenced
 	 * somehow becomes null.
 	 */
-	private ArrayList<Object> decodeBytes(String [] bytes, String format) 
-			throws IndexOutOfBoundsException, NullPointerException {
+	private ArrayList<String> decodeBytes(String [] bytes, String format) 
+			throws IndexOutOfBoundsException, NullPointerException,
+			DecodeException {
 		String lng = "";
-		ArrayList<Object> out = new ArrayList<Object>();
+		ArrayList<String> out = new ArrayList<String>();
 		char [] formatted = format.toCharArray();
 		int index = 0;
 		int num = 0;
 		for (char c : formatted) {
 			switch (c) {
 			case 'B':
-				out.add(Integer.parseInt(bytes[index], 16));
+				out.add("" + Integer.parseInt(bytes[index], 16));
 				index++;
 				break;
 			case 'H':
 				for (int i = 1; i <= 2; i++, index++)
 					lng += bytes[index];
-				out.add(Integer.parseInt(lng, 16));
+				out.add("" + Integer.parseInt(lng, 16));
 				lng = "";
 				break;
 			case 'f':
-				for (int i = 1; i <= 4; i++, index++)
-					lng += bytes[index];
-				out.add(floatDecode(Long.parseLong(lng, 16)));
+				index += 3;
+				for (int i = 0; i < 4; i++)
+					lng += bytes[index-i];
+				out.add(""
+					+ Float.intBitsToFloat((int)(Long.parseLong(lng, 16))));
 				lng = "";
 				break;
 			case '1':
+			    /*fall through*/
 			case '2':
+			    /*fall through*/	
 			case '3':
+			    /*fall through*/
 			case '4':
+			    /*fall through*/
 			case '5':
+				/*fall through*/
 			case '6':
+				/*fall through*/
 			case '7':
+				/*fall through*/
 			case '8':
+				/*fall through*/
 			case '9':
+				/*fall through*/
 			case '0':
 				num = c - 48;
 				break;
 			case 's':
 				String s = "";
-				for(; index <= num; index++) {
-					s += (char)Integer.parseInt(bytes[index]);
+				try {
+					for(; index <= num; index++) {
+					    s += (char)Integer.parseInt(bytes[index]);
+				        }
+				} catch (NumberFormatException e) {
+					throw new DecodeException();
 				}
 				out.add(s);
 				break;
@@ -166,10 +187,5 @@ public class CANMessage extends Message {
 			}
 		}
 		return out;
-	}
-
-	private Float floatDecode(Long bits) {
-		bits.byteValue();
-		return null;
 	}
 }
