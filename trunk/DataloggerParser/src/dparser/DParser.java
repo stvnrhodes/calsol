@@ -2,6 +2,8 @@ package dparser;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Scanner;
 
@@ -10,6 +12,7 @@ import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 import org.json.JSONException;
+import au.com.bytecode.opencsv.CSVWriter;
 
 /**
  * Parser written for the CalSol datalogger
@@ -61,8 +64,11 @@ public class DParser {
 					while (f.hasNext()) {
 						p.parse(f.nextLine());
 					}
-					/*writeFiles(file);*/
+					writeFiles(file);
 				} catch (FileNotFoundException e) {
+					/*Do nothing!*/
+					e.printStackTrace();
+				} catch (IOException e) {
 					/*Do nothing!*/
 					e.printStackTrace();
 				}
@@ -82,12 +88,14 @@ public class DParser {
 	 * @param file : The original file that was opened for parsing - needed
 	 * to get the name of the file.
 	 */
-	private static void writeFiles(File file) {
+	private static void writeFiles(File file) throws IOException {
 		String fileName = file.getName();
 		fileName = fileName.substring(0,fileName.indexOf('.')) + "p.csv";
 		try {
-			PrintStream pr = new PrintStream(new File(fileName));
-			pr.print(p);
+			
+			FileWriter f = new FileWriter(new File(fileName));
+			CSVWriter wr = new CSVWriter(f);
+			wr.writeAll(p.getStrings());
 		} catch (FileNotFoundException e) {
 			// Do nothing!
 			e.printStackTrace();

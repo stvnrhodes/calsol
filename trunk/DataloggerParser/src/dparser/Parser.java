@@ -379,6 +379,23 @@ public class Parser {
 		return debug;
 	}
 	
+	public ArrayList<Message> getData() {
+		return data;
+	}
+	
+	public ArrayList<String []> getStrings() {
+		ArrayList<String []> list = new ArrayList<String []>();
+		for (int i = 0; i < data.size(); i++) 
+			list.add(data.get(i).params());
+		return list;
+	}
+
+
+	public void setData(ArrayList<Message> dat) {
+		data = dat;
+	}
+
+	
 	@Override
 	public String toString() {
 		String out = "";
