@@ -29,7 +29,9 @@ public class DParser {
 	/**
 	 * Creates a Parser object, and also prompts the user for a .dla
 	 * file location. Then it attempts to parse the file
-	 * and then output. This method fails to execute if the Parser 
+	 * and then output. It repeats this process for as long as the user
+	 * chooses a file and does not hit the "cancel" button.
+	 * This method fails to execute if the Parser 
 	 * object cannot locate where the JSON files for the CAN Message
 	 * decoder are. It also fails if the parser cannot read the input 
 	 * file.
@@ -38,6 +40,7 @@ public class DParser {
 	public static void main(String[] args) {
 		try {
 			p = new Parser();
+			p.setVerbose(true);
 		} catch(FileNotFoundException e) {
 			e.printStackTrace();
 			return;
@@ -45,7 +48,6 @@ public class DParser {
 			e.printStackTrace();
 			return;
 		}
-		p.setVerbose(true);
 		while (true) {
 			JFileChooser fd = new JFileChooser(".");
 			FileFilter filter = new FileNameExtensionFilter(

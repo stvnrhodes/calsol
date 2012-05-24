@@ -161,11 +161,11 @@ public abstract class Message {
 			} catch (NullPointerException e) {
 				out += timestamp.toString() + "\n";
 			} finally {
-				out += header.toString() + "\n" + data.toString();
+				out += header.toString() + "\n" + data.toString() + "\n";
 			}
 		}
 		else {
-			out += header.toString() + "\n" + data.toString();
+			out += header.toString() + "\n" + data.toString() + "\n";
 		}
 		return out;
 	}
