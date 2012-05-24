@@ -151,6 +151,47 @@ public abstract class Message {
 			return;
 	}
 	
+	public String [] params() {
+		String ts = "";
+		if (timestamped) {
+			try {
+				ts = timestamp.toString() + " ± " 
+						+ tsError.toString();
+				String h = header.toString();
+				try {
+					String d =  data.toString();
+					String [] out = {ts, h, d};
+					return out;
+				} catch (NullPointerException e) {
+					String [] out = {ts, h};
+					return out;
+				}
+			} catch (NullPointerException e) {
+				ts = timestamp.toString();
+				String h = header.toString();
+				try {
+					String d =  data.toString();
+					String [] out = {ts, h, d};
+					return out;
+				} catch (NullPointerException f) {
+					String [] out = {ts, h};
+					return out;
+				}
+			}
+		}
+		else {
+			String h = header.toString();
+			try {
+				String d =  data.toString();
+				String [] out = {h, d};
+				return out;
+			} catch (NullPointerException e) {
+				String [] out = {h};
+				return out;
+			}
+		}
+	}
+	
 	@Override
 	public String toString() {
 		String out = "";
