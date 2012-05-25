@@ -198,15 +198,15 @@ public abstract class Message {
 		if (timestamped) {
 			try {
 				out += timestamp.toString() + " ± " 
-						+ tsError.toString() + "\n";
+						+ tsError.toString() + "\r\n";
 			} catch (NullPointerException e) {
-				out += timestamp.toString() + "\n";
+				out += timestamp.toString() + "\r\n";
 			} finally {
-				out += header.toString() + "\n" + data.toString() + "\n";
+				out += header.toString() + "\r\n" + data.toString() + "\r\n";
 			}
 		}
 		else {
-			out += header.toString() + "\n" + data.toString() + "\n";
+			out += header.toString() + "\r\n" + data.toString() + "\r\n";
 		}
 		return out;
 	}

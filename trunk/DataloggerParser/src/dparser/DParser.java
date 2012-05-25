@@ -95,6 +95,8 @@ public class DParser {
 			
 			FileWriter f = new FileWriter(new File(fileName));
 			CSVWriter wr = new CSVWriter(f);
+			String [] out = {"Timestamp", "Message", "Data"};
+			wr.writeNext(out);
 			wr.writeAll(p.getStrings());
 		} catch (FileNotFoundException e) {
 			// Do nothing!

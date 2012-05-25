@@ -117,6 +117,8 @@ public class CANMessage extends Message {
 	 * reaches an end of a list unexpectedly
 	 * @throws NullPointerException If one of the objects referenced
 	 * somehow becomes null.
+	 * @throws DecodeException If the payload does not have sufficient
+	 * information for the parser to decode. (aka. missing bytes)
 	 */
 	private ArrayList<String> decodeBytes(String [] bytes, String format) 
 			throws IndexOutOfBoundsException, NullPointerException,
@@ -133,10 +135,12 @@ public class CANMessage extends Message {
 				index++;
 				break;
 			case 'H':
-				for (int i = 1; i <= 2; i++, index++)
-					lng += bytes[index];
+				index++;
+				for (int i = 0; i < 2; i++)
+					lng += bytes[index-i];
 				out.add("" + Integer.parseInt(lng, 16));
 				lng = "";
+				index++;
 				break;
 			case 'f':
 				index += 3;
@@ -145,6 +149,7 @@ public class CANMessage extends Message {
 				out.add(""
 					+ Float.intBitsToFloat((int)(Long.parseLong(lng, 16))));
 				lng = "";
+				index++;
 				break;
 			case '1':
 			    /*fall through*/
@@ -170,7 +175,7 @@ public class CANMessage extends Message {
 			case 's':
 				String s = "";
 				try {
-					for(; index <= num; index++) {
+					for(int i = 0; i <= num; i++, ++index) {
 					    s += (char)Integer.parseInt(bytes[index]);
 				        }
 				} catch (NumberFormatException e) {
