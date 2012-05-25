@@ -13,12 +13,11 @@ public class FloatTester {
 	 * @param args : Main class String [] args thing.
 	 */
 	public static void main(String[] args) {
-		String test = "407547AF";
+		String test = "43010560";
 		Long l = Long.parseLong(test, 16);
-		System.out.println(Long.toBinaryString(l));
 		float asFloat = Float.intBitsToFloat((int)Long.parseLong(test, 16));
 		double asDouble = Double.longBitsToDouble(l);
-		System.out.println((double)asFloat);
+		System.out.println(asFloat);
 		System.out.println(asDouble);
 		System.out.println(Integer.parseInt("EC", 16));
 	}
