@@ -10,7 +10,7 @@ for i = 1:length(struct)
     end %if
     subplot(2,1,j);
     plot(struct(i).times, struct(i).values);
-    title(sprintf([struct(i).id ' ' struct(i).name]));
+    title(sprintf([struct(i).name]));
     xlabel('Time (s)');
     ylabel(struct(i).desc)
     minimum = min(struct(i).values);

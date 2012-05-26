@@ -446,9 +446,4 @@ public class Parser {
 		}
 		return out;
 	}
-
-
-	public void setData(ArrayList<Message> dat) {
-		data = dat;
-	}
 }

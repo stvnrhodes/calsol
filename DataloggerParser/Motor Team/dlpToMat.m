@@ -8,10 +8,10 @@ structSide = 2;
 while ~feof(fid)
     line = fgetl(fid);
     line = regexp(line, ';', 'split');
-    numTime = line{1};
+    numTime = str2double(line{1});
     attribute = line{2};
     description = line{3};
-    value = line{4};
+    value = str2double(line{4});
     if isempty(data)
         data(1).name = attribute;
         data(1).desc = description;
@@ -21,8 +21,8 @@ while ~feof(fid)
     end % if
     found = false;
     for i = 1:length(data)
-        if strcmpi(data(i).name, attribute)...
-            && strcmpi(data(i).desc, description)
+        if strcmpi(data(i).desc, description)...
+            && strcmpi(data(i).name, attribute)
             attributeLoc = i;
             found = true;
             break;
