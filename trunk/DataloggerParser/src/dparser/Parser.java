@@ -306,7 +306,7 @@ public class Parser {
 				try {
 					A = decoder.get(i).getJSONObject("0x" + sp[5]);
 					try {
-						h.add(A.getString("name"));
+						h.add("0x" + sp[5] + " " + A.getString("name"));
 					} catch (JSONException e) {
 						/* Do nothing! */
 					}
@@ -404,8 +404,7 @@ public class Parser {
 	}
 	
 	/**
-	 * 
-	 * @return All non-error data.
+	 * @return All non-error data in an ArrayList of arrays of Strings.
 	 */
 	public ArrayList<String []> getStrings() {
 		ArrayList<String []> list = new ArrayList<String []>();
@@ -414,21 +413,42 @@ public class Parser {
 		return list;
 	}
 	
+	/**
+	 * @return All error data in an ArrayList of arrays of Strings.
+	 */
 	public ArrayList<String[]> getErrorStrings() {
-		// TODO Auto-generated method stub
-		return null;
+		ArrayList<String []> list = new ArrayList<String []>();
+		for (int i = 0; i < errors.size(); i++)
+			list.add(errors.get(i).params());
+		return list;
+	}
+	
+	/**
+	 * @return All data going to Motor team or to whomever wishes to process
+	 * the Datalogger output in MATLAB.
+	 */
+	public ArrayList<String> getMatStrings() {
+		ArrayList<String> out = new ArrayList<String>();
+		out.ensureCapacity((int)(data.size() * 1.5));
+		for(int i = 0; i < data.size(); i++) {
+			Message tempMsg = data.get(i);
+			if (!tempMsg.hasData)
+				continue;
+			ArrayList<String> temp;
+			try {
+				temp = tempMsg.pack();
+			} catch (PackException e) {
+				continue;
+			}
+			for (int j = 0; j < temp.size(); j++) {
+				out.add(temp.get(j));
+			}
+		}
+		return out;
 	}
 
 
 	public void setData(ArrayList<Message> dat) {
 		data = dat;
-	}
-
-	
-	@Override
-	public String toString() {
-		String out = "";
-		matrix.toString();
-		return out;
 	}
 }

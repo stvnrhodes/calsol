@@ -21,10 +21,16 @@ public abstract class Message {
 	public boolean timestamped = false;
 	
 	/**
-	 * Is the Message a CAN Message that is not an error message?
+	 * Is the Message a CAN Message?
 	 * If so, this is set to true. Otherwise, this defaults to false.
 	 */
 	public boolean isCAN = false;
+	
+	/**
+	 * Does the Message have data? If so, this is set to true. Otherwise,
+	 * this defaults to false.
+	 */
+	public boolean hasData = false;
 	
 	/**
 	 * This Double is set to whatever the timestamp of the
@@ -195,6 +201,30 @@ public abstract class Message {
 				return out;
 			}
 		}
+	}
+	
+	/**
+	 * Intended only for use with timestamped Messages going to Motor team.
+	 * @return The major parameters of a Message timestamp,
+	 * header, and data in that order. 
+	 * This is for the Matlab reader - the format will be as
+	 * follows: <br>
+	 * timestamp;name;description;data
+	 */
+	public ArrayList<String> pack() throws PackException {
+		ArrayList<String> packed = new ArrayList<String>();
+		String out = "";
+		if (data.size() < 1 || header.size() < 2)
+			throw new PackException();
+		for (int i = 0; i < header.size() - 1; i++) {
+			out += timestamp.toString() + ";";
+			out += header.get(0) + ";";
+			out += header.get(i + 1) + ";";
+			out += data.get(i);
+			packed.add(out);
+		    out = "";
+		}
+		return packed;
 	}
 	
 	/**

@@ -17,6 +17,7 @@ public class CTMessage extends Message {
 		data = new ArrayList<String>();
 		for (int i = 2; i < info.length; i++)
 			data.add(info[i]);
+		hasData = true;
 	}
 
 }
