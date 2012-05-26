@@ -28,7 +28,7 @@ public class Accelerometer extends Message {
 		String out = "";
 		for (int i = 0; i < data.size(); i++) {
 			out += timestamp.toString() + ";";
-			out += header.get(0) + " " + (char)('X' + i) + ";";
+			out += header.get(0) + ";" + (char)('X' + i) + ";";
 		    out += data.get(i);
 			packed.add(out);
 		    out = "";
