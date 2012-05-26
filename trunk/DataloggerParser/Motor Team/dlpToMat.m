@@ -7,8 +7,11 @@ data = struct([]);
 structSide = 2;
 while ~feof(fid)
     line = fgetl(fid);
-    line = regexp.split(line, ';', 'split');
-    
+    line = regexp(line, ';', 'split');
+    numTime = line{1};
+    attribute = line{2};
+    description = line{3};
+    value = line{4};
     if isempty(data)
         data(1).name = attribute;
         data(1).desc = description;
@@ -18,7 +21,8 @@ while ~feof(fid)
     end % if
     found = false;
     for i = 1:length(data)
-        if strcmpi(data(i).name, attribute)
+        if strcmpi(data(i).name, attribute)...
+            && strcmpi(data(i).desc, description)
             attributeLoc = i;
             found = true;
             break;
@@ -28,7 +32,6 @@ while ~feof(fid)
         data(attributeLoc).times = [data(attributeLoc).times numTime];
         data(attributeLoc).values = [data(attributeLoc).values value];
     else
-        data(structSide).id = id;
         data(structSide).name = attribute;
         data(structSide).desc = description;
         data(structSide).times = numTime;
