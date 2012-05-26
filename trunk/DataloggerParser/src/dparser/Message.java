@@ -89,11 +89,11 @@ public abstract class Message {
 	 * Sets up a new Message. The constructor first determines whether
 	 * there is a timestamp associated with the Message, and then
 	 * acts accordingly.
-	 * @param info : The split String coming from the datalogger
+	 * @param info The split String coming from the datalogger
 	 * line. Element 0 should be an opCode. Element 1 should either
 	 * be a timestamp, or the payload that should be processed 
 	 * accordingly. Element 2, if it exists, will be part of the payload.
-	 * @param ts : <b>True</b> means that there is a timestamp. 
+	 * @param ts <b>True</b> means that there is a timestamp. 
 	 * <b>False</b> means that there is no timestamp.
 	 */
 	public Message(String [] info, boolean ts) {
@@ -111,7 +111,7 @@ public abstract class Message {
 		return header;
 	}
 	/**
-	 * @param s : The String that the header is to be 
+	 * @param s The String that the header is to be 
 	 * set equal to.
 	 */
 	public void setHeader(ArrayList<String> s) {
@@ -131,7 +131,7 @@ public abstract class Message {
 	
 	/**
 	 * Sets the timestamp for a timestamped Message.
-	 * @param s : The purported String that contains timestamp information.
+	 * @param s The purported String that contains timestamp information.
 	 */
 	public void setTimestamp(String s) {
 		if (timestamped)
@@ -151,6 +151,11 @@ public abstract class Message {
 			return;
 	}
 	
+	/**
+	 * @return An array of Strings that includes the Message's 
+	 * timestamp (if it exists), the error on the timestamp (if it exists),
+	 * the header, and the data carried by the Message (if it exists).
+	 */
 	public String [] params() {
 		String ts = "";
 		if (timestamped) {
@@ -192,6 +197,10 @@ public abstract class Message {
 		}
 	}
 	
+	/**
+	 * Prints out the Message and its timestamp and its error. If the timestamp
+	 * and/or error do not exist, they will not be printed.
+	 */
 	@Override
 	public String toString() {
 		String out = "";
