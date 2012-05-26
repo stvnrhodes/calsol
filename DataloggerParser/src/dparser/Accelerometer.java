@@ -19,6 +19,20 @@ public class Accelerometer extends Message {
 		for (int i = 3; i < info.length; i+=2) {
 			data.add(info[i]);
 		}
+		hasData = true;
 	}
-
+	
+	@Override
+	public ArrayList<String> pack() {
+		ArrayList<String> packed = new ArrayList<String>();
+		String out = "";
+		for (int i = 0; i < data.size(); i++) {
+			out += timestamp.toString() + ";";
+			out += header.get(0) + " " + (char)('X' + i) + ";";
+		    out += data.get(i);
+			packed.add(out);
+		    out = "";
+		}
+		return packed;
+	}
 }

@@ -16,5 +16,4 @@ public class CANOverflow extends Message {
 		super(info,ts);
 		header.add("CAN Overflow");
 	}
-
 }

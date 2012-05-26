@@ -14,8 +14,10 @@ public class CANMessage extends Message {
 			boolean ts, boolean error, String format) {
 		super(info,ts);
 		isCAN = true;
-		if (error)
+		if (error) {
+			header.add("CAN Overflow");
 			return;
+		}
 		if (format == null)
 			return;
 		data = new ArrayList<String>();
@@ -27,17 +29,15 @@ public class CANMessage extends Message {
 	        }
 		} catch (IndexOutOfBoundsException e) {
 			data.add("Error decoding payload");
-			e.printStackTrace();
 			return;
 		} catch (NullPointerException e) {
 			data.add("Error decoding payload");
-			e.printStackTrace();
 			return;
 		} catch (DecodeException e) {
 			data.add("Error decoding payload");
-			e.printStackTrace();
 			return;
 		}
+		hasData = true;
 	}
 	
 	/**
@@ -192,5 +192,30 @@ public class CANMessage extends Message {
 			}
 		}
 		return out;
+	}
+	
+	/**
+	 * This pack() method also checks for whether the CAN Message
+	 * is a Tritium ID message, in which the parser should not continue
+	 * to try to pack the message.
+	 */
+	@Override
+	public ArrayList<String> pack() throws PackException {
+		ArrayList<String> packed = new ArrayList<String>();
+		String out = "";
+		if (data.size() < 1 || header.size() < 2)
+			throw new PackException();
+		for (int i = 0; i < header.size() - 1; i++) {
+			out += timestamp.toString() + ";";
+			out += header.get(0) + ";";
+			out += header.get(i + 1) + ";";
+			if (header.get(0).substring
+					(0, header.get(0).indexOf(" ")).equals("0x400"))
+				throw new PackException();
+			out += data.get(i);
+			packed.add(out);
+		    out = "";
+		}
+		return packed;
 	}
 }
