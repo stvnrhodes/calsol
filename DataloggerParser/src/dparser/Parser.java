@@ -91,25 +91,44 @@ public class Parser {
 	
 	/**
 	 * This enum contains the different opCodes that are specified
-	 * in the datalogger documentation.<br>
-	 * Accelerometer: <b>ACL = 0</b> <br>
-	 * Buffer Overflow: <b>BOVF = 1</b> <br>
-	 * CAN Message: <b>CM = 2</b> <br>
-	 * CAN Overflow: <b>COVF = 3</b> <br>
-	 * SD Card Information: <b>CRD = 4</b> <br>
-	 * Parameters: <b>PRM = 5</b> <br>
-	 * Parameters(typo): <b>PWM = 5</b> <br>
-	 * SD Card Mounted: <b>MNT = 6</b> <br>
-	 * Statistical Performance Measurement: <b>PS = 7</b> <br>
-	 * Statistical Voltage Measuremet: <b>VS = 8</b> <br>
-	 * SD Card Dismount: <b>DM = 9</b> <br>
-	 * CAN Transmit Error: <b>CT = 10</b> <br>
+	 * in the datalogger documentation. CAN Overflow may be unused since
+	 * the code inside the CAN Message already handles the overflow message.
+	 * <table>
+	 * <tr><td>Message Type</td><td>OpCode</td><td>Value in Enum</td>
+	 * <tr><td>Accelerometer</td><td><b>ACL</b></td><td>0</td></tr>
+	 * 
+	 * <tr><td>Buffer Overflow</td><td><b>BOVF</b></td><td>1</td></tr>
+	 * 
+	 * <tr><td>CAN Message</td><td><b>CM</b></td><td>2</td></tr>
+	 * 
+	 * <tr><td>CAN Overflow</td><td><b>COVF</b></td><td>3</td></tr>
+	 * 
+	 * <tr><td>CAN Overflow (typo)</td><td><b>MOVF</b></td><td>3</td></tr>
+	 * 
+	 * <tr><td>SD Card Information</td><td><b>CRD</b></td><td>4</td></tr>
+	 * 
+	 * <tr><td>Parameters</td><td><b>PRM</b></td><td>5</td></tr>
+	 * 
+	 * <tr><td>Parameters(typo)</td><td><b>PWM</b></td><td>5</td></tr> 
+	 * 
+	 * <tr><td>SD Card Mounted</td><td><b>MNT</b></td><td>6</td></tr> 
+	 * 
+	 * <tr><td>Statistical Performance Measurement</td>
+	 * <td><b>PS</b></td><td>7</td></tr>
+	 * 
+	 * <tr><td>Statistical Voltage Measurement</td>
+	 * <td><b>VS</b></td><td>8</td></tr>
+	 * 
+	 * <tr><td>SD Card Dismount</td><td><b>DM</b></td><td>9</td></tr>
+	 * 
+	 * <tr><td>CAN Transmit Error</td><td><b>CT</b></td><td>10</td></tr>
 	 */
 	private enum code {
 		ACL  (0),
 		BOVF (1),
 		CM   (2),
 		COVF (3),
+		MOVF (3),
 		CRD  (4),
 		PRM  (5),
 		PWM  (5),
@@ -152,7 +171,7 @@ public class Parser {
 	 * Initializes the directory and files where the JSON 
 	 * files are kept, so that the Parser may decode CAN 
 	 * Message payloads when needed.
-	 * @throws FileNotFoundException : If the Scanner cannot
+	 * @throws FileNotFoundException If the Scanner cannot
 	 * read the JSON files needed to decode the CAN Messages.
 	 */
 	public Parser() throws FileNotFoundException, JSONException {
@@ -185,7 +204,7 @@ public class Parser {
 	 * things. Where the data goes or which ArrayList it's added
 	 * into is dependent on its opCode and payload. This method
 	 * currently ignores PRM/PWM messages.
-	 * @param data : A line of datalogger output.
+	 * @param data A line of datalogger output.
 	 */
 	public void parse(String data) {
 		String [] sp = data.split(" ");
@@ -201,7 +220,8 @@ public class Parser {
 			break;
 		case 2:
 			boolean isError = false;
-			if (sp[2].equalsIgnoreCase("covf")) {
+			if (sp[2].equalsIgnoreCase("covf") 
+					|| sp[2].equalsIgnoreCase("movf")) {
 				isError = true;
 				temp = new CANMessage(sp, true, isError, null);
 				errors.add(temp);
@@ -276,7 +296,7 @@ public class Parser {
 	 * implements some pre-made JSON decoders, imported. This triple
 	 * for loop is there because someone decided to put values inside
 	 * values for the JSON files.
-	 * @param sp : The payload incoming from a CAN Message.
+	 * @param sp The payload incoming from a CAN Message.
 	 */
 	private ArrayList<String> decodeJSON(String[] sp) {
 		JSONObject A = null;
@@ -322,7 +342,7 @@ public class Parser {
 	
 	/**
 	 * Adds a piece of non-error data to the ArrayList <b>matrix</b>.
-	 * @param temp : The message to be added to the large matrix of data
+	 * @param temp The message to be added to the large matrix of data
 	 */
 	private void addToMatrix(Message temp) {
 		int i = findIndex(temp.header);
@@ -383,11 +403,20 @@ public class Parser {
 		return data;
 	}
 	
+	/**
+	 * 
+	 * @return All non-error data.
+	 */
 	public ArrayList<String []> getStrings() {
 		ArrayList<String []> list = new ArrayList<String []>();
 		for (int i = 0; i < data.size(); i++) 
 			list.add(data.get(i).params());
 		return list;
+	}
+	
+	public ArrayList<String[]> getErrorStrings() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 

@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.util.Scanner;
 
 import javax.swing.JFileChooser;
@@ -38,7 +37,7 @@ public class DParser {
 	 * object cannot locate where the JSON files for the CAN Message
 	 * decoder are. It also fails if the parser cannot read the input 
 	 * file.
-	 * @param args : Main class; args is unused.
+	 * @param args Main class; args is unused.
 	 */
 	public static void main(String[] args) {
 		try {
@@ -90,14 +89,22 @@ public class DParser {
 	 */
 	private static void writeFiles(File file) throws IOException {
 		String fileName = file.getName();
-		fileName = fileName.substring(0,fileName.indexOf('.')) + "p.csv";
+		fileName = fileName.substring(0,fileName.indexOf('.')) + "data.csv";
 		try {
 			
 			FileWriter f = new FileWriter(new File(fileName));
 			CSVWriter wr = new CSVWriter(f);
-			String [] out = {"Timestamp", "Message", "Data"};
-			wr.writeNext(out);
+			String [] data = {"Timestamp", "Message", "Data"};
+			wr.writeNext(data);
 			wr.writeAll(p.getStrings());
+			f.close();
+			wr.close();
+			fileName = fileName.substring(0,fileName.indexOf('.')) + "errors.csv";
+			f = new FileWriter(new File(fileName));
+			wr = new CSVWriter(f);
+			String [] errors = {"Timestamp", "Error Type"};
+			wr.writeNext(errors);
+			wr.writeAll(p.getErrorStrings());
 		} catch (FileNotFoundException e) {
 			// Do nothing!
 			e.printStackTrace();
