@@ -446,4 +446,15 @@ public class Parser {
 		}
 		return out;
 	}
+
+	/**
+	 * Garbage collection.
+	 */
+	public void clearFields() {
+		data = new ArrayList<Message>();
+		cfg = new ArrayList<Message>();
+		errors = new ArrayList<Message>();
+		matrixIndex = new ArrayList<ArrayList<String>>();
+		matrix = new ArrayList<ArrayList<Message>>();
+	}
 }

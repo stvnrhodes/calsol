@@ -4,8 +4,8 @@ function [] = dataOutput(struct)
 % Outputs to however many files there are
 % Elements in the struct array.
 for i = 1:length(struct)
-    outTime = struct(i).times;
-    name = [struct(i).str ' ' struct(i).id];
+    outTime = struct(i).times';
+    name = [struct(i).name];
     text = [name '.csv'];
     output = [outTime struct(i).values'];
     dlmwrite(text, output, 'delimiter', ',', 'precision', '%.11f');
