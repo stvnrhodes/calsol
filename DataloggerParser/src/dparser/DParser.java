@@ -72,6 +72,7 @@ public class DParser {
 					/*Do nothing!*/
 					e.printStackTrace();
 				}
+			    p.clearFields();
 			}
 			else if (returnVal == JFileChooser.CANCEL_OPTION)
 				break;
