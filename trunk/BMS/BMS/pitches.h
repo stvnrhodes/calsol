@@ -1,8 +1,10 @@
 /* CalSol - UC Berkeley Solar Vehicle Team
  * pitches.h - BMS Module
  * Purpose: Stores pitches for song playing
+ * In May 2012, Steven Rhodes converted this 
+ * to a librart for playing songs.
  * Author(s): Brian Duffy, Steven Rhodes
- * Date: May 8 2012
+ * Date: May 27 2012
  */
 
 /*************************************************
@@ -11,6 +13,18 @@
 
 #ifndef _PITCHES_H_
 #define _PITCHES_H_
+
+
+
+//extern "C" {
+//  void tone(uint8_t _pin, unsigned int frequency, unsigned long duration = 0);
+//  void noTone(unsigned int);
+//}
+#include <WProgram.h>
+#include <avr/pgmspace.h>
+//#include <Tone.cpp>
+
+
 
 #define SILENCE  0
 #define NOTE_B0  31
@@ -159,10 +173,10 @@ const prog_uint16_t kHighTemperatureBeep[][2] = {
 
 class Song {
  public:
-  Song(int);
+  Song(byte);
 
   /* Start playing the chosen song */
-  void PlaySong(const prog_uint16_t **);
+  void PlaySong(const prog_uint16_t[][2]);
 
   /* Continue playing the chosen song.  Should be called every 25ms */
   void KeepPlaying(void);
@@ -174,7 +188,7 @@ class Song {
   char buzzer_;
   unsigned int note_start_time_;
   unsigned int note_duration_;
-  prog_uint16_t song_[][];
+  const prog_uint16_t (*song_)[2];
 };
 
 #endif
