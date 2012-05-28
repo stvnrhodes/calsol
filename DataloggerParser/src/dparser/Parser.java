@@ -62,6 +62,21 @@ public class Parser {
 	 */
 	private static ArrayList<ArrayList<Message>> matrix = 
 			new ArrayList<ArrayList<Message>>();
+
+	/**
+	 * The first header that Motor Team is interested in.
+	 */
+	private ArrayList<String> m1 = new ArrayList<String>();
+	
+	/**
+	 * The second header that Motor Team is interested in.
+	 */
+	private ArrayList<String> m2 = new ArrayList<String>();
+	
+	/**
+	 * The third header that Motor Team is interested in.
+	 */
+	private ArrayList<String> m3 = new ArrayList<String>();
 	
 	/**
 	 * If debug is set to <b>true</b>, then this printstream will be
@@ -196,6 +211,15 @@ public class Parser {
 			}
 			decoder.add(new JSONObject(f));
 		}
+		m1.add("Accelerometer");
+		m2.add("0x403 Velocity Measurement");
+		m2.add(" Motor Velocity rpm Motor angular frequency in revolutions per minute.");
+		m2.add(" Vehicle Velocity m/s Vehicle velocity in metres / second.");
+		m3.add("0x40E Odometer & Bus AmpHours Measurement");
+		m3.add(" Odometer meters the distance the vehicle has travelled " +
+				"since reset.");
+		m3.add(" DC Bus AmpHours Ampere-hours The charge flow into the " +
+				"controller bus voltage from the time of reset.");
 	}
 	
 	
@@ -424,7 +448,7 @@ public class Parser {
 	}
 	
 	/**
-	 * @return All data going to Motor team or to whomever wishes to process
+	 * @return All data going to whomever wishes to process
 	 * the Datalogger output in MATLAB.
 	 */
 	public ArrayList<String> getMatStrings() {
@@ -442,6 +466,38 @@ public class Parser {
 			}
 			for (int j = 0; j < temp.size(); j++) {
 				out.add(temp.get(j));
+			}
+		}
+		return out;
+	}
+	
+	/**
+	 * @return All data going to Motor Team.
+	 * This output is to be processed in MATLAB.
+	 */
+	public ArrayList<String> getMotorStrings() {
+		ArrayList<String> out = new ArrayList<String>();
+		out.ensureCapacity((int)(data.size() * 0.4));
+		for(int i = 0; i < data.size(); i++) {
+			Message tempMsg = data.get(i);
+			if (!tempMsg.hasData)
+				continue;
+			if (tempMsg.header.equals(m1) 
+					|| tempMsg.header.equals(m2) 
+					|| tempMsg.header.equals(m3)) {
+				ArrayList<String> temp;
+				try {
+					temp = tempMsg.pack();
+				} catch (PackException e) {
+					continue;
+				}
+				if (tempMsg.header.equals(m3)) {
+					out.add(temp.get(0));
+				} else {
+				    for (int j = 0; j < temp.size(); j++) {
+					    out.add(temp.get(j));
+				    }
+				}
 			}
 		}
 		return out;

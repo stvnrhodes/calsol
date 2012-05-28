@@ -4,11 +4,12 @@ function [] = plots(struct)
 % Struct array of telemetry data expected
 j = 1;
 for i = 1:length(struct)
-    if j > 2
-        j = 1;
-        figure
-    end %if
-    subplot(2,1,j);
+%     if j > 2
+%         j = 1;
+%         figure
+%     end %if
+%     subplot(2,1,j);
+    figure
     plot(struct(i).times, struct(i).values);
     title(sprintf([struct(i).name]));
     xlabel('Time (s)');
@@ -18,6 +19,6 @@ for i = 1:length(struct)
     if minimum ~= maximum && minimum < maximum
         ylim([minimum maximum])
     end %if
-    j = j + 1;
+%     j = j + 1;
 end % for
 end % function
