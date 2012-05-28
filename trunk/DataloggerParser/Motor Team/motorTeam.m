@@ -1,4 +1,4 @@
-function [data] = dlpToMat(file)
+function [data] = motorTeam(file)
 % [data] = telemetry(file)
 % Reads in a datalogger parser output file and turns it into a struct
 % array.
@@ -39,5 +39,18 @@ while ~feof(fid)
         structSide = structSide + 1;
     end % if
 end % while
-
+while(~strcmpi(data(4).desc, ...
+        ' Vehicle Velocity m/s Vehicle velocity in metres / second.'))
+    temp = data(4);
+    data(4) = data(5);
+    data(5) = data(6);
+    data(6) = temp;
+end % while
+while(~strcmpi(data(5).desc, ...
+        [' Motor Velocity rpm Motor angular '...
+        'frequency in revolutions per minute.']))
+    temp = data(5);
+    data(5) = data(6);
+    data(6) = temp;
+end % while
 end % function

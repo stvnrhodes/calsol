@@ -107,6 +107,7 @@ public class DParser {
 			wr.writeAll(p.getStrings());
 			f.close();
 			wr.close();
+			
 			fileName = file.getName().substring(0,file.getName().indexOf('.'))
 					+ "errors.csv";
 			f = new FileWriter(new File(fileName));
@@ -116,13 +117,23 @@ public class DParser {
 			wr.writeAll(p.getErrorStrings());
 			f.close();
 			wr.close();
+			
 			fileName = file.getName().substring(0,file.getName().indexOf('.'))
 					+ "toMat.txt";
 			PrintStream pr = new PrintStream(new File(fileName));
-			ArrayList<String> motorTeam = p.getMatStrings();
+			ArrayList<String> mat = p.getMatStrings();
+			for(int i = 0; i < mat.size(); i++)
+			    pr.println(mat.get(i));
+			pr.close();
+			
+			fileName = file.getName().substring(0,file.getName().indexOf('.'))
+					+ "MotorTeam.txt";
+			pr = new PrintStream(new File(fileName));
+			ArrayList<String> motorTeam = p.getMotorStrings();
 			for(int i = 0; i < motorTeam.size(); i++)
 			    pr.println(motorTeam.get(i));
 			pr.close();
+			
 		} catch (FileNotFoundException e) {
 			// Do nothing!
 			e.printStackTrace();
