@@ -12,8 +12,7 @@
 // Relays
 #define BATTERY_RELAY  18 // Check this!
 #define SOLAR_RELAY   19 // Check this!
-#define RELAY3         20  // No led
-#define LVRELAY        22
+#define LV_RELAY        22
 // LEDs
 #define LEDFAIL  23
 #define CANINT    3
@@ -34,9 +33,6 @@
 // I/O
 #define OUT_BUZZER    21
 #define KEY_SWITCH   2
-#define IN_SONG1       1   // SONG 1 (Tetris)
-#define IN_SONG2       0   // SONG 2 (Bad Romance)
-#define IO_T4         31   // Analog 0
 // BPS
 #define LT_CS         11
 

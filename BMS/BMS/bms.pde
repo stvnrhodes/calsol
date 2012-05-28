@@ -148,34 +148,27 @@ void InitPins(void) {
   pinMode(OUT_BUZZER, OUTPUT);
   pinMode(BATTERY_RELAY, OUTPUT);
   pinMode(SOLAR_RELAY, OUTPUT);
-  pinMode(RELAY3, OUTPUT); // DELETE?
-  pinMode(LVRELAY, OUTPUT);
-  pinMode(LEDFAIL, OUTPUT); // DELETE?
-  pinMode(IO_T4, OUTPUT); // DELETE?
+  pinMode(LV_RELAY, OUTPUT);
+  pinMode(LEDFAIL, OUTPUT);
   pinMode(LT_CS, OUTPUT);
   pinMode(FAN1, OUTPUT);
   pinMode(FAN2, OUTPUT);
   pinMode(KEY_SWITCH, INPUT);
-  pinMode(IN_SONG1, INPUT); // DELETE?
-  pinMode(IN_SONG2, INPUT); // DELETE?
   pinMode(V_BATTERY, INPUT);
   pinMode(V_MOTOR, INPUT);
   pinMode(C_BATTERY, INPUT);
+  pinMode(C_SOLAR, INPUT);
+  pinMode(C_GND, INPUT);
 
   digitalWrite(OUT_BUZZER, LOW);
   digitalWrite(BATTERY_RELAY, LOW);
   digitalWrite(SOLAR_RELAY, LOW);
-  digitalWrite(RELAY3, LOW); // DELETE?
-  digitalWrite(LVRELAY, LOW);
-  digitalWrite(LEDFAIL, LOW); // DELETE?
+  digitalWrite(LV_RELAY, LOW);
+  digitalWrite(LEDFAIL, LOW);
   digitalWrite(LT_CS, HIGH);
   digitalWrite(FAN1, LOW);
   digitalWrite(FAN2, LOW);
   digitalWrite(KEY_SWITCH, HIGH);
-  digitalWrite(IN_SONG1, HIGH); // DELETE?
-  digitalWrite(IN_SONG2, HIGH); // DELETE?
-  digitalWrite(V_BATTERY, HIGH); //DELETE?
-  digitalWrite(V_MOTOR, HIGH); //DELETE?
 }
 
 void InitSpi(void) {
@@ -260,7 +253,7 @@ void GetFlags(Flags *flags, const CarDataInt *car_data) {
   flags->charging_overcurrent = car_data->battery_current < CHARGING_OVERCURRENT_CUTOFF;
   flags->batteries_charging = car_data->battery_current < 0;
   
-  flags.motor_precharged = (car_data->motor_voltage > MOTOR_MINUMUM_VOLTAGE) &&
+  flags->motor_precharged = (car_data->motor_voltage > MOTOR_MINIMUM_VOLTAGE) &&
       (car_data->battery_voltage - car_data->motor_voltage < MOTOR_MAXIMUM_DELTA);
   
   flags->missing_lt_communication = false;
@@ -281,9 +274,9 @@ void GetFlags(Flags *flags, const CarDataInt *car_data) {
     flags->battery_overtemperature = high_temperature > OVERTEMP_CUTOFF;
     flags->battery_overtemperature_warning = high_temperature > OVERTEMP_WARNING;
     flags->charging_overtemperature = high_temperature > CHARGING_OVERTEMP_CUTOFF;
-    flags->charging_overtemperature_warning = high_temperature > CHARGING_OVERTEMP_WARNING;
+    flags->charging_temperature_warning = high_temperature > CHARGING_OVERTEMP_WARNING;
 
-    if (flags->charging_disabled && high_temperature < OK_TO_CHARGE) {
+    if (flags->charging_disabled && high_temperature < TEMPERATURE_OK_TO_CHARGE) {
       flags->charging_disabled = false;
     } else if (!flags->charging_disabled && high_temperature > OVERTEMPERATURE_NO_CHARGE) {
       flags->charging_disabled = true;
@@ -347,14 +340,14 @@ CarState GetCarState(const CarState old_state, const Flags *flags) {
       EEPROM.write(EEPROM.read(0), BPS_UNDERVOLT);
       return TURN_OFF;
     }
-    if (flags->battery_overcurrent) {
+    if (flags->discharging_overcurrent) {
       #ifdef VERBOSE
         Serial.println("Shutting down, batteries are putting out too much current");
       #endif
       EEPROM.write(EEPROM.read(0), S_OVERCURRENT);
       return TURN_OFF;
     }
-    if (flags->battery_charging_overcurrent) {
+    if (flags->charging_overcurrent) {
       #ifdef VERBOSE
         Serial.println("Shutting down, batteries are taking in too much current");
       #endif
@@ -412,7 +405,8 @@ void ConvertCarData(CarDataFloat *out, const CarDataInt *in) {
   out->battery_voltage = in->battery_voltage / 1000.0;
   out->motor_voltage = in->motor_voltage / 1000.0;
   out->battery_current = in->battery_current / 1000.0;
-  out->solar_current = in->solar_current / 1000.0
+  out->solar_current = in->solar_current / 1000.0;
+}
 
 void DisableCharging (void) {
   #ifdef CAN_DEBUG
@@ -433,7 +427,7 @@ void EnableCharging (void) {
 }
 
 signed int GetBatteryVoltage(void) {
-  static signed int[] old_readings = {0xffff, 0x8fff, 0xffff};
+  static signed int old_readings[] = {0xffff, 0x8fff, 0xffff};
   static byte ptr = 0;
   
   // We need to make this a long to avoid rounding errors when we scale
@@ -448,7 +442,7 @@ signed int GetBatteryVoltage(void) {
 }
 
 signed int GetMotorVoltage(void) {
-  static signed int[] old_readings = {0xffff, 0x8fff, 0xffff};
+  static signed int old_readings[] = {0xffff, 0x8fff, 0xffff};
   static byte ptr = 0;
   
   long reading = analogRead(V_MOTOR);
@@ -462,7 +456,7 @@ signed int GetMotorVoltage(void) {
 }
 
 signed int GetBatteryCurrent(void) {
-  static signed int[] old_readings = {0xffff, 0x8fff, 0xffff};
+  static signed int old_readings[] = {0xffff, 0x8fff, 0xffff};
   static byte ptr = 0;
   
   old_readings[ptr] = analogRead(C_BATTERY) - analogRead(C_GND);
@@ -475,7 +469,7 @@ signed int GetBatteryCurrent(void) {
 }
 
 signed int GetSolarCellCurrent(void) {
-  static signed int[] old_readings = {0xffff, 0x8fff, 0xffff};
+  static signed int old_readings[] = {0xffff, 0x8fff, 0xffff};
   static byte ptr = 0;
   
   old_readings[ptr] = analogRead(C_SOLAR) - analogRead(C_GND);
@@ -515,7 +509,7 @@ signed int GetIntMedian(const signed int * array) {
   return low;
 }
 
-void GetLtDataMedian(LTData median, const LTMultipleData * array) {
+void GetLtDataMedian(LTData *median, const LTMultipleData * array) {
   int avgs[NUM_OF_AVERAGES];
   for (int i = 0; i < NUM_OF_VOLTAGES; ++i) {
     for (int j = 0; j < NUM_OF_AVERAGES; ++j) {
@@ -536,15 +530,14 @@ void AddReading(LTMultipleData * mult, const LTData * reading) {
   mult->ptr = (mult->ptr + 1) % NUM_OF_AVERAGES;
 }
 
-void GetLtBoardData(LTData *new_data, byte board_num,
-    const LTMultipleData * avg_data) {
+void GetLtBoardData(LTData *new_data, byte board_num, LTMultipleData * avg_data) {
   byte config;
 
   SpiStart();
   SendToSpi(kBoardAddress + board_num, 1);
-  config = RDCFG
-  SendToSpi(&config);
-  byte rconfig[6]
+  config = RDCFG;
+  SendToSpi(&config, 1);
+  byte rconfig[6];
   GetFromSpi(rconfig, RDCFG, 6);
   SpiEnd();
   
@@ -590,24 +583,24 @@ void SendLtBoardCanMessage(const LTData * data, byte board_num) {
     Serial.print(board_num)
     Serial.print(", voltages: ");
   #endif
-  for (int i = 0; i < kNumOfCells[board_num]; ++i) {
+  for (int i = 0; i < kLTNumOfCells[board_num]; ++i) {
     msg.f[0] = data->voltage[i] * LT_VOLT_TO_FLOAT;
     #ifdef CAN_DEBUG
       Serial.print(msg.f[0]);
       Serial.print(", ");
     #endif
-    Can.send(CanMessage(board_address + i, msg.c, 4);
+    Can.send(CanMessage(board_address + i, msg.c, 4));
   }
   #ifdef CAN_DEBUG
     Serial.println(" and some temperatures, too.");
   #endif
   board_address += CAN_BPS_TEMP_OFFSET;
   msg.f[0] = ToTemperature(data->temperature[0]);
-  Can.send(CanMessage(board_address, msg.c, 4);
+  Can.send(CanMessage(board_address, msg.c, 4));
   msg.f[0] = ToTemperature(data->temperature[1]);
-  Can.send(CanMessage(board_address + 1, msg.c, 4);
-  msg.f[0] = data->temperature[2] * LT_THIRD_TEMP_TO_FLOAT - KELVIN_CELCIUS_BIAS;
-  Can.send(CanMessage(board_address + 2, msg.c, 4);
+  Can.send(CanMessage(board_address + 1, msg.c, 4));
+  msg.f[0] = data->temperature[2] * LT_THIRD_TEMP_TO_FLOAT - CELCIUS_KELVIN_BIAS;
+  Can.send(CanMessage(board_address + 2, msg.c, 4));
 }
   
 void SendGeneralDataCanMessage(const CarDataFloat * data) {
@@ -628,7 +621,7 @@ void SendGeneralDataCanMessage(const CarDataFloat * data) {
   Can.send(CanMessage(CAN_CUTOFF_VOLT, msg.c, 8));
   msg.f[0] = data->battery_current;
   msg.f[1] = data->solar_current;
-  Can.send(CanMessage(CAN_CUTOFF_CURR, 8));
+  Can.send(CanMessage(CAN_CUTOFF_CURR, msg.c,  8));
 }  
 
 void SendErrorCanMessage(Flags *flags) {
@@ -673,7 +666,7 @@ void GetFromSpi(byte * data, byte info, int length) {
   }
 }
 
-void ParseSPIData(LTData *data, const byte voltages[], 
+void ParseSpiData(LTData *data, const byte voltages[], 
     const byte temperatures[]) {
   data->voltage[0] = (voltages[0] & 0xFF) | (voltages[1] & 0x0F) << 8;
   data->voltage[1] = (voltages[1] & 0xF0) >> 4 | (voltages[2] & 0xFF) << 4;
@@ -695,16 +688,16 @@ void ParseSPIData(LTData *data, const byte voltages[],
 void PrintErrorMessage(enum error_codes code) {
   char buffer[MAX_STR_SIZE];
   if (code > UNKNOWN_SHUTDOWN) {
-    code = UNKNOWN_SHUTDOWN);
+    code = UNKNOWN_SHUTDOWN;
   }
   strcpy_P(buffer, (char *)pgm_read_word(&(error_code_lookup[code])));
   Serial.println(buffer);
 }
 
-int HighestVoltage(LTData *board) {
+int HighestVoltage(const LTData *board) {
   int max = 0x00;
   for (int i = 0; i < NUM_OF_LT_BOARDS; ++i) {
-    for (int j = 0; j < kNumOfCells[i]; ++j) {
+    for (int j = 0; j < kLTNumOfCells[i]; ++j) {
       if (max < board[i].voltage[j]) {
         max = board[i].voltage[j];
       }
@@ -713,10 +706,10 @@ int HighestVoltage(LTData *board) {
   return max;
 }
 
-int LowestVoltage(LTData *board) {
+int LowestVoltage(const LTData *board) {
   int min = 0x00;
   for (int i = 0; i < NUM_OF_LT_BOARDS; ++i) {
-    for (int j = 0; j < kNumOfCells[i]; ++j) {
+    for (int j = 0; j < kLTNumOfCells[i]; ++j) {
       if (min > board[i].voltage[j]) {
         min = board[i].voltage[j];
       }
@@ -725,7 +718,7 @@ int LowestVoltage(LTData *board) {
   return min;
 }
 
-float HighestTemperature(LTData *board) {
+float HighestTemperature(const LTData *board) {
   float max = 0x00;
   float current;
   for (int i = 0; i < NUM_OF_LT_BOARDS; ++i) {
