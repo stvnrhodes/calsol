@@ -6,8 +6,9 @@
  */
 
 // #define CAN_DEBUG
-// #define VERBOSE
+ #define VERBOSE
 // #define SPI_DEBUG
+ #define CRITICAL_ERRORS
 
 #include <SPI.h>
 #include <EEPROM.h>
@@ -32,6 +33,7 @@ byte lt_counter = 0;
 LTMultipleData averaging_data[NUM_OF_LT_BOARDS];
 
 void setup() {
+   Serial.begin(9600);
    InitPins();
    InitSpi();
    InitLtBoardData();
@@ -48,8 +50,8 @@ void loop() {
     GetFlags(&flags, &car_data);
     car_state = GetCarState(car_state, &flags);
     #ifdef VERBOSE
-      print("Car State: ");
-      println(car_state);
+      Serial.print("Car State: ");
+      Serial.println(car_state);
     #endif
     switch(car_state) {
       case TURN_OFF:
@@ -75,7 +77,9 @@ void loop() {
         break;
     }
     if (!buzzer.IsPlaying()) {
-      if (flags.battery_overvoltage_warning || flags.module_undervoltage_warning) {
+      if (flags.missing_lt_communication) {
+        buzzer.PlaySong(kMissingLtCommunication);
+      } else if (flags.battery_overvoltage_warning || flags.module_undervoltage_warning) {
         buzzer.PlaySong(kHighVoltageBeep);
       } else if (flags.battery_undervoltage_warning || flags.module_undervoltage_warning) {
         buzzer.PlaySong(kLowVoltageBeep);
@@ -105,14 +109,11 @@ void loop() {
   }
 
   if (time - heartbeat_time > HEARTBEAT_TIME_LENGTH) {
-    Serial.println("Hello World"); // Delete this soon
     #ifdef CAN_DEBUG
       Serial.print("Can RX: ");
       Serial.print(Can.rxError());
       Serial.print(" TX: ");
-      Serial.print(Can.txError());
-      Serial.print(" Error Flags: ");
-      Serial.println(Can._mcp2515.read(EFLG), HEX);
+      Serial.println(Can.txError());
     #endif
     SendHeartbeat();
     heartbeat_time = time;
@@ -130,13 +131,13 @@ void InitEEPROM(void) {
   PrintErrorMessage((enum error_codes) EEPROM.read(memory_index));
   #ifdef VERBOSE
     Serial.println("Earlier shutdown messages:");
-    for (i = memory_index - 1; i != memory_index; --i) {
+    for (int i = memory_index - 1; i != memory_index; --i) {
       if (i == 0) {
-        i = NUM_OF_ERROR_MESSAGES);
+        i = NUM_OF_ERROR_MESSAGES;
       }
       Serial.print(i);
       Serial.print(": ");
-      PrintErrorMessage((enum error_codes) EEPROM.read(memory_index))
+      PrintErrorMessage((enum error_codes) EEPROM.read(memory_index));
     }
   #endif
   memory_index = (memory_index % NUM_OF_ERROR_MESSAGES) + 1;
@@ -173,7 +174,7 @@ void InitPins(void) {
 
 void InitSpi(void) {
   #ifdef SPI_DEBUG
-    println("Initializing SPI");
+    Serial.println("Initializing SPI");
   #endif
   SPI.begin();
   SPI.setClockDivider(SPI_CLOCK_DIV64);
@@ -219,7 +220,7 @@ void InitCan(void) {
 
 void SendHeartbeat(void){
   #ifdef CAN_DEBUG
-    println("Sending Cutoff and BPS Hearbeats");
+    Serial.println("Sending Cutoff and BPS Hearbeats");
   #endif
   Can.send(CanMessage(CAN_HEART_CUTOFF));
   Can.send(CanMessage(CAN_HEART_BPS));
@@ -580,7 +581,7 @@ void SendLtBoardCanMessage(const LTData * data, byte board_num) {
   TwoFloats msg;
   #ifdef CAN_DEBUG
     Serial.print("Sending LtBoardCanMessage ");
-    Serial.print(board_num)
+    Serial.print(board_num);
     Serial.print(", voltages: ");
   #endif
   for (int i = 0; i < kLTNumOfCells[board_num]; ++i) {
@@ -658,12 +659,30 @@ void SendToSpi(const byte * data, int length) {
   for (int i = 0; i < length; ++i) {
     SPI.transfer(data[i]);
   }
+  #ifdef SPI_DEBUG
+    Serial.print("Sent to SPI: ");
+    for (int i = 0; i < length; ++i) {
+      Serial.print(data[i], HEX);
+      Serial.print(", ");
+    }
+    Serial.println("end of message");
+  #endif
 }
     
 void GetFromSpi(byte * data, byte info, int length) {
   for (int i = 0; i < length; ++i) {
     data[i] = SPI.transfer(info);
   }
+  #ifdef SPI_DEBUG
+    Serial.print("Got SPI (sent ");
+    Serial.print(info, HEX);
+    Serial.print("): ");
+    for (int i = 0; i < length; ++i) {
+      Serial.print(data[i], HEX);
+      Serial.print(", ");
+    }
+    Serial.println("end of message");
+  #endif
 }
 
 void ParseSpiData(LTData *data, const byte voltages[], 

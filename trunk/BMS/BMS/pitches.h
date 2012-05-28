@@ -14,8 +14,7 @@
 #ifndef _PITCHES_H_
 #define _PITCHES_H_
 
-
-
+#define PITCHES_DEBUG
 //extern "C" {
 //  void tone(uint8_t _pin, unsigned int frequency, unsigned long duration = 0);
 //  void noTone(unsigned int);
@@ -170,6 +169,14 @@ const prog_uint16_t kHighTemperatureBeep[][2] = {
   {SILENCE, 0}
 };
 
+const prog_uint16_t kMissingLtCommunicationBeep[][2] = {
+  {NOTE_C4, 100},
+  {SILENCE, 200},
+  {NOTE_C4, 100},
+  {SILENCE, 500},
+
+  {SILENCE, 0}
+};
 
 class Song {
  public:
