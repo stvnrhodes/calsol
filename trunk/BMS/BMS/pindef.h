@@ -65,7 +65,7 @@ const prog_char reason_S_ENABLE_CHARGING[]
 const prog_char reason_S_DISABLE_CHARGING[]
     PROGMEM = "Unsafe to charge, disabling charging";
 const prog_char reason_S_COMPLETED_PRECHARGE[]
-    PROGMEM = "Unsafe to charge, disabling charging";
+    PROGMEM = "Completed precharge, ready to drive";
 const prog_char reason_UNKNOWN[]
     PROGMEM = "Unknown Shutdown Code";
 
