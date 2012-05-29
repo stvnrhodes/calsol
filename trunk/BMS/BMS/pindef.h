@@ -60,6 +60,12 @@ const prog_char reason_BPS_OVERVOLT[]
     PROGMEM = "BPS, Battery Module Overvoltage";
 const prog_char reason_BPS_OVERTEMP[]
     PROGMEM = "BPS, Battery Module Overtemperature";
+const prog_char reason_S_ENABLE_CHARGING[]
+    PROGMEM = "Safe to charge, enabling charging";
+const prog_char reason_S_DISABLE_CHARGING[]
+    PROGMEM = "Unsafe to charge, disabling charging";
+const prog_char reason_S_COMPLETED_PRECHARGE[]
+    PROGMEM = "Unsafe to charge, disabling charging";
 const prog_char reason_UNKNOWN[]
     PROGMEM = "Unknown Shutdown Code";
 
@@ -80,6 +86,9 @@ PROGMEM const char *error_code_lookup[] = {
   reason_BPS_UNDERVOLT,
   reason_BPS_OVERVOLT,
   reason_BPS_OVERTEMP,
+  reason_S_ENABLE_CHARGING,
+  reason_S_DISABLE_CHARGING,
+  reason_S_COMPLETED_PRECHARGE,
   reason_UNKNOWN
 };
 
@@ -95,6 +104,9 @@ enum error_codes {
   BPS_UNDERVOLT,
   BPS_OVERVOLT,
   BPS_OVERTEMP,
+  S_ENABLE_CHARGING,
+  S_DISABLE_CHARGING,
+  S_COMPLETED_PRECHARGE,
   UNKNOWN_SHUTDOWN // Must always be last one
 };
 

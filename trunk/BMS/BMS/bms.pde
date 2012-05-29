@@ -100,9 +100,9 @@ void loop() {
       SendLtBoardCanMessage(car_data.lt_board + lt_counter, lt_counter);
     } else {
       #ifdef CAN_DEBUG
-        Serial.print("CAN: No communication from LT Board ");
+        Serial.print("CAN: no LT Board ");
         Serial.print(lt_counter, DEC);
-        Serial.println(", so no CAN message sent");
+        Serial.println(" comm, no msg sent");
       #endif
     }
     lt_counter = (lt_counter + 1) % NUM_OF_LT_BOARDS;
@@ -229,7 +229,7 @@ void InitCan(void) {
 
 void SendHeartbeat(void){
   #ifdef CAN_DEBUG
-    Serial.println("CAN: Sending Cutoff and BPS Hearbeats");
+    Serial.println("CAN: sent Cutoff, BPS Heartbeat");
   #endif
   Can.send(CanMessage(CAN_HEART_CUTOFF));
   Can.send(CanMessage(CAN_HEART_BPS));
@@ -332,7 +332,8 @@ CarState GetCarState(const CarState old_state, const Flags *flags) {
   if (car_state == CAR_ON && !(flags->charging_disabled)) {
     if (flags->too_full_to_charge || flags->too_hot_to_charge){
       #ifdef CRITICAL_MESSAGES
-        Serial.println("Unsafe to charge, disabling charging");
+        // Serial.println("Unsafe to charge, disabling charging");
+        PrintErrorMessage(S_DISABLE_CHARGING);
       #endif
       return DISABLE_CHARGING;
     }
@@ -425,14 +426,16 @@ CarState GetCarState(const CarState old_state, const Flags *flags) {
   }
   if (old_state == IN_PRECHARGE && flags->motor_precharged) {
     #ifdef CRITICAL_MESSAGES
-      Serial.println("Precharge completed, turning on");
+      // Serial.println("Precharge completed, turning on");
+      PrintErrorMessage(S_COMPLETED_PRECHARGE);
     #endif
     return TURN_ON;
   }
   if (car_state == CAR_ON && flags->charging_disabled) {
     if (!(flags->too_full_to_charge) && !(flags->too_hot_to_charge)){
       #ifdef CRITICAL_MESSAGES
-        Serial.println("Safe to charge, reenabling charging");
+        // Serial.println("Safe to charge, reenabling charging");
+        PrintErrorMessage(S_ENABLE_CHARGING);
       #endif
       return ENABLE_CHARGING;
     }
@@ -454,7 +457,7 @@ void ConvertCarData(CarDataFloat *out, const CarDataInt *in) {
 void DisableCharging (void) {
   #ifdef CAN_DEBUG
     Serial.print("CAN: Not yet implemented, ");
-    Serial.println("Sending message to prevent regen");
+    Serial.println("CAN: sent Prevent Regen Msg");
   #endif
   // TODO(stvn): Send CAN message to prevent regen
   digitalWrite(C_SOLAR, LOW);
@@ -462,8 +465,8 @@ void DisableCharging (void) {
 
 void EnableCharging (void) {
   #ifdef CAN_DEBUG
-    Serial.print("CAN: Not yet implemented, ");
-    Serial.println("Sending message to allow regen");
+    Serial.print("Not yet implemented, ");
+    Serial.println("CAN: sent Allow Regen Msg");
   #endif
   // TODO(stvn): Send CAN message to allow regen
   digitalWrite(C_SOLAR, HIGH);
@@ -654,9 +657,9 @@ void SendLtBoardCanMessage(const LTData * data, byte board_num) {
   int board_address = CAN_BPS_BASE + board_num * CAN_BPS_MODULE_OFFSET;
   TwoFloats msg;
   #ifdef CAN_DEBUG
-    Serial.print("CAN: Sending LtBoardCanMessage ");
+    Serial.print("CAN: sent LT Board ");
     Serial.print(board_num);
-    Serial.print(", voltages: ");
+    Serial.print(" msg, v: ");
   #endif
   for (int i = 0; i < kLTNumOfCells[board_num]; ++i) {
     msg.f[0] = data->voltage[i] * LT_VOLT_TO_FLOAT;
@@ -667,7 +670,7 @@ void SendLtBoardCanMessage(const LTData * data, byte board_num) {
     Can.send(CanMessage(board_address + i, msg.c, 4));
   }
   #ifdef CAN_DEBUG
-    Serial.println(" and some temperatures, too.");
+    Serial.println();
   #endif
   board_address += CAN_BPS_TEMP_OFFSET;
   msg.f[0] = ToTemperature(data->temperature[0]);
@@ -681,14 +684,14 @@ void SendLtBoardCanMessage(const LTData * data, byte board_num) {
 void SendGeneralDataCanMessage(const CarDataFloat * data) {
   TwoFloats msg;
   #ifdef CAN_DEBUG
-    Serial.print("CAN: Sending General CAN Message, ");
-    Serial.print("battery voltage: ");
+    Serial.print("CAN: sent Data Msg, ");
+    Serial.print("battery V: ");
     Serial.print(data->battery_voltage);
-    Serial.print(", motor voltage: ");
+    Serial.print(", motor V: ");
     Serial.print(data->motor_voltage);
-    Serial.print(", battery current: ");
+    Serial.print(", battery C: ");
     Serial.print(data->battery_current);
-    Serial.print(", solar current: ");
+    Serial.print(", solar C: ");
     Serial.println(data->solar_current);
   #endif
   msg.f[0] = data->battery_voltage;
