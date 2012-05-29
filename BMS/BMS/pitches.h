@@ -14,15 +14,12 @@
 #ifndef _PITCHES_H_
 #define _PITCHES_H_
 
-//#define PITCHES_DEBUG
-//extern "C" {
-//  void tone(uint8_t _pin, unsigned int frequency, unsigned long duration = 0);
-//  void noTone(unsigned int);
-//}
+
 #include <WProgram.h>
 #include <avr/pgmspace.h>
-//#include <Tone.cpp>
 
+//#define PITCHES_DEBUG
+#define PITCHES_H_USE_TONE
 
 
 #define SILENCE  0
