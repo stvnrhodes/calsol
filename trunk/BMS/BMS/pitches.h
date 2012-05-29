@@ -14,7 +14,7 @@
 #ifndef _PITCHES_H_
 #define _PITCHES_H_
 
-#define PITCHES_DEBUG
+//#define PITCHES_DEBUG
 //extern "C" {
 //  void tone(uint8_t _pin, unsigned int frequency, unsigned long duration = 0);
 //  void noTone(unsigned int);
@@ -116,7 +116,7 @@
 #define NOTE_D8  4699
 #define NOTE_DS8 4978
 
-const prog_uint16_t kFullyBootedBeep[][2] = {
+const uint16_t kFullyBootedBeep[][2] = {
   {NOTE_A4, 100},
   {SILENCE, 50},
   {NOTE_A4, 100},
@@ -126,7 +126,7 @@ const prog_uint16_t kFullyBootedBeep[][2] = {
   {SILENCE, 0}
 };
 
-const prog_uint16_t kStartupBeep[][2] = {
+const uint16_t kStartupBeep[][2] = {
   {NOTE_A3, 100},
   {SILENCE, 50},
   {NOTE_E4, 100},
@@ -134,7 +134,7 @@ const prog_uint16_t kStartupBeep[][2] = {
   {SILENCE, 0}
 };
 
-const prog_uint16_t kShutdownBeep[][2] = {
+const uint16_t kShutdownBeep[][2] = {
   {NOTE_E4, 100},
   {SILENCE, 50},
   {NOTE_A3, 100},
@@ -142,7 +142,7 @@ const prog_uint16_t kShutdownBeep[][2] = {
   {SILENCE, 0}
 };
 
-const prog_uint16_t kLowVoltageBeep[][2] = {
+const uint16_t kLowVoltageBeep[][2] = {
   {NOTE_A3, 100},
   {NOTE_C4, 100},
   {NOTE_A3, 100},
@@ -151,7 +151,7 @@ const prog_uint16_t kLowVoltageBeep[][2] = {
   {SILENCE, 0}
 };
 
-const prog_uint16_t kHighVoltageBeep[][2] = {
+const uint16_t kHighVoltageBeep[][2] = {
   {NOTE_C4, 100},
   {NOTE_A3, 100},
   {NOTE_C4, 100},
@@ -160,7 +160,7 @@ const prog_uint16_t kHighVoltageBeep[][2] = {
   {SILENCE, 0}
 };
 
-const prog_uint16_t kHighTemperatureBeep[][2] = {
+const uint16_t kHighTemperatureBeep[][2] = {
   {NOTE_C4, 100},
   {NOTE_D4, 100},
   {NOTE_E4, 100},
@@ -169,7 +169,7 @@ const prog_uint16_t kHighTemperatureBeep[][2] = {
   {SILENCE, 0}
 };
 
-const prog_uint16_t kMissingLtCommunicationBeep[][2] = {
+const uint16_t kMissingLtCommunicationBeep[][2] = {
   {NOTE_C4, 100},
   {SILENCE, 200},
   {NOTE_C4, 100},
@@ -192,9 +192,10 @@ class Song {
   bool IsPlaying(void);
 
  private:
-  char buzzer_;
-  unsigned int note_start_time_;
-  unsigned int note_duration_;
+  byte buzzer_;
+  int note_number_;
+  unsigned long note_start_time_;
+  uint16_t note_duration_;
   const prog_uint16_t (*song_)[2];
 };
 
