@@ -831,10 +831,12 @@ float HighestTemperature(const LTData *board) {
     if (max < current) {
       max = current;
     }
-    current = CONVERT_THIRD_TO_CELCIUS(board[i].temperature[2]);
-    if (max < current) {
-      max = current;
-    }
+    // The internal die temperature seems unreliable for now, so let's 
+    // ignore it when determining if we have too high a temperature.
+//    current = CONVERT_THIRD_TO_CELCIUS(board[i].temperature[2]);
+//    if (max < current) {
+//      max = current;
+//    }
   }
   return max;
 }

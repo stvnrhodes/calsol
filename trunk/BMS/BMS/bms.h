@@ -64,7 +64,7 @@
 #define SONG_TIME_LENGTH 25
 
 /* LT Boards */
-const char kLTNumOfCells[] = {10, 12, 11};  // Check this!
+const char kLTNumOfCells[] = {10, 12, 11};
 const byte kBoardAddress[] = {0x80, 0x81, 0x82};
 #define WRCFG 0x01   // Write config
 #define RDCFG 0x02   // Read config
