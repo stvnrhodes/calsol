@@ -27,7 +27,7 @@ long heartbeat_time;
 long battery_time;
 long song_time;
 
-// Hackish, but I need to maintain a counter for this somewhere
+// Hackish, but I need to maintain a counter for this somewhere.  Used in loop().
 byte lt_counter = 0;
 
 // Only used to average out readings from LT boards
@@ -231,8 +231,9 @@ void SendHeartbeat(void){
   #ifdef CAN_DEBUG
     Serial.println("CAN: sent Cutoff, BPS Heartbeat");
   #endif
-  Can.send(CanMessage(CAN_HEART_CUTOFF));
-  Can.send(CanMessage(CAN_HEART_BPS));
+  char data = 0;
+  Can.send(CanMessage(CAN_HEART_CUTOFF, &data, 1));
+  Can.send(CanMessage(CAN_HEART_BPS, &data, 1));
 }
 
 void GetCarData(CarDataInt *car_data) {
@@ -258,14 +259,14 @@ void GetFlags(Flags *flags, const CarDataInt *car_data) {
   flags->battery_undervoltage = car_data->battery_voltage < UNDERVOLTAGE_CUTOFF;
   flags->battery_undervoltage_warning = car_data->battery_voltage < UNDERVOLTAGE_WARNING;
 
-  // TODO(stvn): Check assumptions about negative == charging
-  flags->discharging_overcurrent = car_data->battery_current > OVERCURRENT_CUTOFF;
+  // TODO:(stvn): Test assumption that negative current == charging
+  flags->discharging_overcurrent = car_data->battery_current > DISCHARGING_OVERCURRENT_CUTOFF;
   flags->charging_overcurrent = car_data->battery_current < CHARGING_OVERCURRENT_CUTOFF;
-  flags->batteries_charging = car_data->battery_current < 0;
+  flags->batteries_charging = car_data->battery_current < CHARGING_THRESHOLD;
   
   flags->motor_precharged = (car_data->motor_voltage > MOTOR_MINIMUM_VOLTAGE) &&
       (car_data->battery_voltage - car_data->motor_voltage < MOTOR_MAXIMUM_DELTA);
-  
+      
   flags->missing_lt_communication = false;
   for (int i = 0; i < NUM_OF_LT_BOARDS; ++i) {
     if (!(car_data->lt_board[i].is_valid)) {
@@ -329,15 +330,6 @@ CarState GetCarState(const CarState old_state, const Flags *flags) {
     #endif
     return CAR_OFF;
   }
-  if (car_state == CAR_ON && !(flags->charging_disabled)) {
-    if (flags->too_full_to_charge || flags->too_hot_to_charge){
-      #ifdef CRITICAL_MESSAGES
-        // Serial.println("Unsafe to charge, disabling charging");
-        PrintErrorMessage(S_DISABLE_CHARGING);
-      #endif
-      return DISABLE_CHARGING;
-    }
-  }
   if (old_state != CAR_OFF) {
     if (flags->missing_lt_communication) {
       #ifdef CRITICAL_MESSAGES
@@ -363,7 +355,9 @@ CarState GetCarState(const CarState old_state, const Flags *flags) {
       EEPROM.write(EEPROM.read(0), S_UNDERVOLT);
       return TURN_OFF;
     }
-    if (flags->module_overvoltage && flags->batteries_charging) {
+    // TODO(stvn): Calibrate current, then replace this with commented out line.
+    if (flags->module_overvoltage) {
+    // if (flags->module_overvoltage && flags->batteries_charging) {
       #ifdef CRITICAL_MESSAGES
         // Serial.println("Shutting down, a battery module is too high voltage");
         PrintErrorMessage(BPS_OVERVOLT);
@@ -430,6 +424,15 @@ CarState GetCarState(const CarState old_state, const Flags *flags) {
       PrintErrorMessage(S_COMPLETED_PRECHARGE);
     #endif
     return TURN_ON;
+  }
+  if (car_state == CAR_ON && !(flags->charging_disabled)) {
+    if (flags->too_full_to_charge || flags->too_hot_to_charge){
+      #ifdef CRITICAL_MESSAGES
+        // Serial.println("Unsafe to charge, disabling charging");
+        PrintErrorMessage(S_DISABLE_CHARGING);
+      #endif
+      return DISABLE_CHARGING;
+    }
   }
   if (car_state == CAR_ON && flags->charging_disabled) {
     if (!(flags->too_full_to_charge) && !(flags->too_hot_to_charge)){

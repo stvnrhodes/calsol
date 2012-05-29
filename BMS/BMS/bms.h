@@ -35,10 +35,11 @@
 #define MODULE_UNDERVOLTAGE_CUTOFF 1800  // 2.7V, 1.5mV increments
 #define OVERVOLTAGE_CUTOFF 13860  // 138.6V, in 10mV increments
 #define OVERVOLTAGE_WARNING 13695  // 136.95V, in 10mV increments
-#define UNDERVOLTAGE_WARNING 9240  // 103.95V, in 10mV increments
-#define UNDERVOLTAGE_CUTOFF 8910  // 102.3V, in 10mV increments
-#define OVERCURRENT_CUTOFF 4500  // 45A, in 10mA increments
+#define UNDERVOLTAGE_WARNING 9240  // 92.4V, in 10mV increments
+#define UNDERVOLTAGE_CUTOFF 8910  // 89.1V, in 10mV increments
+#define DISCHARGING_OVERCURRENT_CUTOFF 4500  // 45A, in 10mA increments
 #define CHARGING_OVERCURRENT_CUTOFF -4500  // -45A, in 10mA increments
+#define CHARGING_THRESHOLD 100  // -1A, in 10mA increments
 #define MOTOR_MINIMUM_VOLTAGE 9000 // 90V, in 10mV increments
 #define MOTOR_MAXIMUM_DELTA 2000 // 20V, in 10mV increments
 
