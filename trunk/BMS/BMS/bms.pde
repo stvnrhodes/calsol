@@ -6,10 +6,10 @@
  */
 
  #define CRITICAL_MESSAGES
- #define CAN_DEBUG
- #define SPI_DEBUG
- #define VERBOSE
- #define FLAGS
+ //#define CAN_DEBUG
+ //#define SPI_DEBUG
+ //#define VERBOSE
+ //#define FLAGS
 
 #include <SPI.h>
 #include <EEPROM.h>
@@ -78,9 +78,9 @@ void loop() {
         break;
     }
     if (!buzzer.IsPlaying()) {
-      if (flags.battery_overvoltage_warning || flags.module_undervoltage_warning) {
+      if (flags.module_overvoltage_warning) {
         buzzer.PlaySong(kHighVoltageBeep);
-      } else if (flags.battery_undervoltage_warning || flags.module_undervoltage_warning) {
+      } else if (flags.module_undervoltage_warning) {
         buzzer.PlaySong(kLowVoltageBeep);
       } else if (flags.battery_overtemperature_warning) {
         buzzer.PlaySong(kHighTemperatureBeep);
@@ -206,10 +206,10 @@ void InitLtBoardData(void) {
       if (j < NUM_OF_AVERAGES) {
         lt_board = lt_avg->data + j;
         for (byte k = 0; k < NUM_OF_VOLTAGES; ++k) {
-          lt_board->voltage[k] = 0x8fff;
+          lt_board->voltage[k] = 0x7fff;
         }
         for (byte k = 0; k < NUM_OF_TEMPERATURES; ++k) {
-          lt_board->temperature[k] = 0x8fff;
+          lt_board->temperature[k] = 0x7fff;
         }
       }
     }
@@ -473,7 +473,7 @@ void EnableCharging (void) {
 }
 
 signed int GetBatteryVoltage(void) {
-  static signed int old_readings[] = {0xffff, 0x8fff, 0xffff};
+  static signed int old_readings[] = {0xffff, 0x7fff, 0xffff};
   static byte ptr = 0;
   
   // We need to make this a long to avoid rounding errors when we scale
@@ -488,7 +488,7 @@ signed int GetBatteryVoltage(void) {
 }
 
 signed int GetMotorVoltage(void) {
-  static signed int old_readings[] = {0xffff, 0x8fff, 0xffff};
+  static signed int old_readings[] = {0xffff, 0x7fff, 0xffff};
   static byte ptr = 0;
   
   long reading = analogRead(V_MOTOR);
@@ -502,7 +502,7 @@ signed int GetMotorVoltage(void) {
 }
 
 signed int GetBatteryCurrent(void) {
-  static signed int old_readings[] = {0xffff, 0x8fff, 0xffff};
+  static signed int old_readings[] = {0xffff, 0x7fff, 0xffff};
   static byte ptr = 0;
   
   signed long reading = analogRead(C_BATTERY) - analogRead(C_GND);
@@ -516,7 +516,7 @@ signed int GetBatteryCurrent(void) {
 }
 
 signed int GetSolarCellCurrent(void) {
-  static signed int old_readings[] = {0xffff, 0x8fff, 0xffff};
+  static signed int old_readings[] = {0xffff, 0x7fff, 0xffff};
   static byte ptr = 0;
   
   signed long reading = analogRead(C_BATTERY) - analogRead(C_GND);
@@ -716,6 +716,7 @@ void ShutdownCar(const Flags *flags) {
   digitalWrite(POWER_U8, LOW);
   digitalWrite(POWER_U9, LOW);
   digitalWrite(POWER_U10, LOW);
+  buzzer.PlaySong(kShutdownBeep);
 }
 
 void TurnOnCar(void) {
@@ -730,6 +731,7 @@ void TurnOnCar(void) {
   digitalWrite(POWER_U8, HIGH);
   digitalWrite(POWER_U9, HIGH);
   digitalWrite(POWER_U10, HIGH);
+  buzzer.PlaySong(kStartupBeep);
 }
 
 void SendToSpi(const byte * data, int length) {
@@ -803,7 +805,7 @@ int HighestVoltage(const LTData *board) {
 }
 
 int LowestVoltage(const LTData *board) {
-  int min = 0x00;
+  int min = 0x7fff;
   for (int i = 0; i < NUM_OF_LT_BOARDS; ++i) {
     for (int j = 0; j < kLTNumOfCells[i]; ++j) {
       if (min > board[i].voltage[j]) {

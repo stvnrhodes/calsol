@@ -40,7 +40,7 @@
 #define OVERCURRENT_CUTOFF 4500  // 45A, in 10mA increments
 #define CHARGING_OVERCURRENT_CUTOFF -4500  // -45A, in 10mA increments
 #define MOTOR_MINIMUM_VOLTAGE 9000 // 90V, in 10mV increments
-#define MOTOR_MAXIMUM_DELTA 1000 // 10V, in 10mV increments
+#define MOTOR_MAXIMUM_DELTA 2000 // 20V, in 10mV increments
 
 /* Magic Conversion Numbers */
 #define LT_VOLT_TO_FLOAT 0.0015

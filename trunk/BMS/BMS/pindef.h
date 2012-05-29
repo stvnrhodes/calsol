@@ -10,18 +10,18 @@
 
 /* Pinouts */
 // Relays
-#define BATTERY_RELAY  18 // Check this!
-#define SOLAR_RELAY   19 // Check this!
-#define LV_RELAY        22
+#define BATTERY_RELAY 19
+#define SOLAR_RELAY 18
+#define LV_RELAY 22
 // LEDs
-#define LEDFAIL  23
-#define CANINT    3
+#define LEDFAIL 23
+#define CANINT 3
 // Voltage/Current readings
 #define C_GND        5
 #define C_BATTERY    3
 #define C_SOLAR      4
-#define V_BATTERY    1
-#define V_MOTOR      2
+#define V_BATTERY    2
+#define V_MOTOR      1
 // Battery Box Fans
 #define FAN1     24
 #define FAN2     25
@@ -31,8 +31,8 @@
 #define POWER_U8  14
 #define POWER_U3  15
 // I/O
-#define OUT_BUZZER    21
-#define KEY_SWITCH   2
+#define OUT_BUZZER 21
+#define KEY_SWITCH 2
 // BPS
 #define LT_CS         11
 
