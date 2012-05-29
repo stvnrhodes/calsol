@@ -19,8 +19,11 @@ void Song::PlaySong(const prog_uint16_t song[][2]){
 void Song::KeepPlaying() {
   long current_time = millis();
   if (song_ != 0 && note_start_time_ + note_duration_ <= current_time) {
-    digitalWrite(buzzer_, LOW);
-  //  noTone(buzzer_);
+    #ifdef PITCHES_H_USE_TONE
+      noTone(buzzer_);
+    #else
+      digitalWrite(buzzer_, LOW);
+    #endif
     uint16_t note_pitch = song_[note_number_][0];
     note_duration_ = song_[note_number_][1];
     note_start_time_ = current_time;
@@ -36,8 +39,11 @@ void Song::KeepPlaying() {
         Serial.print("Note Pitch: ");
         Serial.println(note_pitch);
       #endif
-      digitalWrite(buzzer_, HIGH);
-//      tone(buzzer_, note_pitch);
+      #ifdef PITCHES_H_USE_TONE
+        tone(buzzer_, note_pitch);
+      #else
+        digitalWrite(buzzer_, HIGH);
+      #endif
     } else {
        #ifdef PITCHES_DEBUG
         Serial.println("Note Pitch: Silence");
