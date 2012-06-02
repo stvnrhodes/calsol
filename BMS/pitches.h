@@ -1,8 +1,8 @@
-/* CalSol - UC Berkeley Solar Vehicle Team 
+/* CalSol - UC Berkeley Solar Vehicle Team
  * pitches.h - BMS Module
  * Purpose: Stores pitches for song playing
- * Author(s): Brian Duffy
- * Date: Jun 18th 2011
+ * Author(s): Brian Duffy, Steven Rhodes
+ * Date: May 8 2012
  */
 
 /*************************************************
@@ -10,8 +10,9 @@
  *************************************************/
 
 #ifndef _PITCHES_H_
-#define _PITCHES_H_ 
+#define _PITCHES_H_
 
+#define SILENCE  0
 #define NOTE_B0  31
 #define NOTE_C1  33
 #define NOTE_CS1 35
@@ -102,73 +103,78 @@
 #define NOTE_D8  4699
 #define NOTE_DS8 4978
 
-//tetris!!!
-int tetrisNotes[] = {
-  NOTE_E4, NOTE_B3, NOTE_C4, NOTE_D4, NOTE_C4, NOTE_B3,
-  NOTE_A3, NOTE_A3, NOTE_C4, NOTE_E4, NOTE_D4, NOTE_C4,
-  NOTE_B3, NOTE_B3, NOTE_C4, NOTE_D4, NOTE_E4,
-  NOTE_C4, NOTE_A3, NOTE_A3,
-  0, NOTE_D4, NOTE_F4, NOTE_A4, NOTE_G4, NOTE_F4,
-  NOTE_E4, NOTE_E4, NOTE_C4, NOTE_E4, NOTE_D4, NOTE_C4,
-  NOTE_B3, NOTE_B3, NOTE_C4, NOTE_D4, NOTE_E4,
-  NOTE_C4, NOTE_A3, NOTE_A3};
+const prog_uint16_t kFullyBootedBeep[][2] = {
+  {NOTE_A4, 100},
+  {SILENCE, 50},
+  {NOTE_A4, 100},
+  {SILENCE, 50},
+  {NOTE_A4, 100},
+
+  {SILENCE, 0}
+};
+
+const prog_uint16_t kStartupBeep[][2] = {
+  {NOTE_A3, 100},
+  {SILENCE, 50},
+  {NOTE_E4, 100},
+
+  {SILENCE, 0}
+};
+
+const prog_uint16_t kShutdownBeep[][2] = {
+  {NOTE_E4, 100},
+  {SILENCE, 50},
+  {NOTE_A3, 100},
+
+  {SILENCE, 0}
+};
+
+const prog_uint16_t kLowVoltageBeep[][2] = {
+  {NOTE_A3, 100},
+  {NOTE_C4, 100},
+  {NOTE_A3, 100},
+  {SILENCE, 50},
+
+  {SILENCE, 0}
+};
+
+const prog_uint16_t kHighVoltageBeep[][2] = {
+  {NOTE_C4, 100},
+  {NOTE_A3, 100},
+  {NOTE_C4, 100},
+  {SILENCE, 50},
+
+  {SILENCE, 0}
+};
+
+const prog_uint16_t kHighTemperatureBeep[][2] = {
+  {NOTE_C4, 100},
+  {NOTE_D4, 100},
+  {NOTE_E4, 100},
+  {SILENCE, 50},
+
+  {SILENCE, 0}
+};
 
 
-  
-int tetrisDuration[] = {
-  4, 8, 8, 4, 8, 8,
-  4, 8, 8, 4, 8, 8,
-  4, 8, 8, 4, 4,
-  4, 4, 2, 
-  8, 4, 8, 4, 8, 8,
-  4, 8, 8, 4, 8, 8,
-  4, 8, 8, 4, 4, 
-  4, 4, 2};
-  
-int tetrisSize = 40;
+class Song {
+ public:
+  Song(int);
 
-//bad romance chorus  
-int badRomanceNotes[] = {
-  0, 0,    NOTE_C4, NOTE_D4, NOTE_E4, NOTE_C4,
-  NOTE_F4, NOTE_E4, NOTE_F4, NOTE_E4,
-  NOTE_D4, NOTE_B3, NOTE_C4, NOTE_D4,
-  NOTE_E4, NOTE_E4, NOTE_E4, NOTE_E4, NOTE_D4,
-  NOTE_C4, NOTE_C4, NOTE_D4, NOTE_E4, NOTE_C4,
-  NOTE_F4, NOTE_E4, NOTE_F4, NOTE_E4,
-  NOTE_D4, NOTE_B3, NOTE_C4, NOTE_D4,
-  NOTE_E4, NOTE_E4, NOTE_E4, NOTE_E4, NOTE_D4,
-  NOTE_C4, 0,
-  NOTE_A3, NOTE_A3, NOTE_E4, NOTE_E4, NOTE_F4, NOTE_F4,
-  0, NOTE_A3, NOTE_A3, NOTE_E4, NOTE_E4, NOTE_F4, NOTE_F4,
-  NOTE_A3, NOTE_A3, NOTE_E4, NOTE_E4, NOTE_F4, NOTE_F4,
-  0, NOTE_C4, NOTE_C4, NOTE_A3, NOTE_C4, NOTE_A3, NOTE_C4 };
-  
-int badRomanceDuration[] = {
-  4, 4, 8, 8, 8, 8,
-  8/3, 8, 8, 8/3,
-  8/3, 8, 4, 4,
-  4, 8, 8, 8, 8/3,
-  2, 8, 8, 8, 8,
-  8/3, 8, 8, 8/3,
-  8/3, 8, 4, 4,
-  4, 8, 8, 8, 8/3,
-  2, 2,
-  4, 4, 8, 8, 8, 8,
-  8, 8, 4, 8, 8, 8, 8,
-  4, 4, 8, 8, 8, 8,
-  8, 8, 8, 8, 8, 8, 4};
-  
+  /* Start playing the chosen song */
+  void PlaySong(const prog_uint16_t **);
 
+  /* Continue playing the chosen song.  Should be called every 25ms */
+  void KeepPlaying(void);
 
-int badRomanceSize = 65;
+  /* Check if we've finished the song */
+  bool IsPlaying(void);
 
-int beepDuration[] = {
- 4, 8, 4};
-
-int beepNotes[] = {
- NOTE_E4, NOTE_B3, NOTE_A4
-}; 
-
-int beepSize = 3;
+ private:
+  char buzzer_;
+  unsigned int note_start_time_;
+  unsigned int note_duration_;
+  prog_uint16_t song_[][];
+};
 
 #endif
