@@ -1,29 +1,28 @@
-/* CalSol - UC Berkeley Solar Vehicle Team 
- * bmsPindef.h - BMS Module
- * Purpose: Pin Definitions for the BMS module
- * Author(s): Jimmy Hack, Ryan Tseng, Brian Duffy
- * Date: Sept 25th 2011
+/* CalSol - UC Berkeley Solar Vehicle Team
+ * pindef.h - BMS Module
+ * Purpose: Define constants and functions for the BMS
+ * Author(s): Steven Rhodes
+ * Date: May 1 2012
  */
 
-#ifndef _BMS_PINDEF_H_
-#define _BMS_PINDEF_H_
-#include <WProgram.h>
+#ifndef BMS_PINDEF_H
+#define BMS_PINDEF_H
 
-/* PINOUTS */
+/* Pinouts */
 // Relays
-#define RELAY1   18
-#define RELAY2   19
-#define RELAY3   20  // No led
-#define LVRELAY  22
+#define BATTERY_RELAY  18 // Check this!
+#define SOLAR_RELAY   19 // Check this!
+#define RELAY3         20  // No led
+#define LVRELAY        22
 // LEDs
 #define LEDFAIL  23
 #define CANINT    3
 // Voltage/Current readings
-#define CGND     5 
-#define C1       3 // Batteries
-#define C2       4 // Motor
-#define V1       1 // Batteries
-#define V2       2 // Motor
+#define C_GND        5
+#define C_BATTERY    3
+#define C_SOLAR      4
+#define V_BATTERY    1
+#define V_MOTOR      2
 // Battery Box Fans
 #define FAN1     24
 #define FAN2     25
@@ -34,68 +33,73 @@
 #define POWER_U3  15
 // I/O
 #define OUT_BUZZER    21
-#define IN_OFFSWITCH   2   // OFF SWITCH
+#define KEY_SWITCH   2
 #define IN_SONG1       1   // SONG 1 (Tetris)
 #define IN_SONG2       0   // SONG 2 (Bad Romance)
 #define IO_T4         31   // Analog 0
 // BPS
 #define LT_CS         11
 
-// This is used to convert floats to char arrays.
-typedef union {
-  char c[8];
-  float f[2];
-} two_floats;
+/* Strings */
 
-/*** 
- * Sets pin direction and initial state.
- ***/
-void initPins() {
-  // Buzzer
-  pinMode(OUT_BUZZER, OUTPUT);
-  digitalWrite(OUT_BUZZER, LOW);
-  
-  // Relays
-  pinMode(RELAY1, OUTPUT);
-  pinMode(RELAY2, OUTPUT);
-  pinMode(RELAY3, OUTPUT);
-  pinMode(LVRELAY, OUTPUT);
-  digitalWrite(RELAY1, LOW);
-  digitalWrite(RELAY2, LOW);
-  digitalWrite(RELAY3, LOW);
-  digitalWrite(LVRELAY, LOW);
-  
-  // LEDs
-  pinMode(LEDFAIL, OUTPUT);
-  digitalWrite(LEDFAIL, LOW);
-  
-  // Off Switch
-  pinMode(IN_OFFSWITCH, INPUT); // OFF SWITCH
-  digitalWrite(IN_OFFSWITCH, HIGH);
-  
-  // Songs
-  pinMode(IN_SONG1, INPUT); // Song 1
-  digitalWrite(IN_SONG1, HIGH);
-  pinMode(IN_SONG2, INPUT); // Song 
-  digitalWrite(IN_SONG2, HIGH);
-  
-  // Spare IO pin
-  pinMode(IO_T4, OUTPUT);
-  
-  // Voltage measurements
-  pinMode(V1, INPUT);
-  digitalWrite(V1, HIGH);
-  pinMode(V2, INPUT);
-  digitalWrite(V2, HIGH);
-  
-  // BPS SPI
-  pinMode(LT_CS, OUTPUT);
-  digitalWrite(LT_CS, HIGH);
-  
-  // Fans
-  pinMode(FAN1, OUTPUT);
-  digitalWrite(FAN1, LOW);
-  pinMode(FAN2, OUTPUT);
-  digitalWrite(FAN2, LOW);
-}
-#endif
+/* Shutdown Reason Error Codes */
+/* these are stored in program memory to decrease SRAM usage */
+/* otherwise we run out of RAM, the board acts strangely and resets */
+/* lesson learned, don't do too many serial prints */
+const prog_char reason_POWER_LOSS[]
+    PROGMEM = "Sudden loss of power.";
+const prog_char reason_KEY_OFF[]
+    PROGMEM = "Normal Shutdown. Key in off position.";
+const prog_char reason_S_UNDERVOLT[]
+    PROGMEM = "High voltage line undervoltage.";
+const prog_char reason_S_OVERVOLT[]
+    PROGMEM = "High voltage line overvoltage.";
+const prog_char reason_S_OVERCURRENT[]
+    PROGMEM = "High voltage line overcurrent.";
+const prog_char reason_BPS_DISCONNECTED[]
+    PROGMEM = "BPS, LT Board Unresponsive";
+const prog_char reason_BPS_UNDERVOLT[]
+    PROGMEM = "BPS, Battery Module Undervoltage";
+const prog_char reason_BPS_OVERVOLT[]
+    PROGMEM = "BPS, Battery Module Overvoltage";
+const prog_char reason_BPS_OVERTEMP[]
+    PROGMEM = "BPS, Battery Module Overtemperature";
+const prog_char reason_UNKNOWN[]
+    PROGMEM = "Unknown Shutdown Code";
+
+// Make sure that this number is larger than the size of the largest string.
+#define MAX_STR_SIZE 40
+
+// This number determines how many messages we're willing to log in the system.
+#define NUM_OF_ERROR_MESSAGES 50
+
+// an array containing all of our error codes
+PROGMEM const char *error_code_lookup[] = {
+  reason_POWER_LOSS,
+  reason_KEY_OFF,
+  reason_S_UNDERVOLT,
+  reason_S_OVERVOLT,
+  reason_S_OVERCURRENT,
+  reason_BPS_DISCONNECTED,
+  reason_BPS_UNDERVOLT,
+  reason_BPS_OVERVOLT,
+  reason_BPS_OVERTEMP,
+  reason_UNKNOWN
+};
+
+
+// This enum matches with the array above
+enum error_codes {
+  POWER_LOSS,
+  KEY_OFF,
+  S_UNDERVOLT,
+  S_OVERVOLT,
+  S_OVERCURRENT,
+  BPS_DISCONNECTED,
+  BPS_UNDERVOLT,
+  BPS_OVERVOLT,
+  BPS_OVERTEMP,
+  UNKNOWN_SHUTDOWN // Must always be last one
+};
+
+#endif BMS_PINDEF_H
