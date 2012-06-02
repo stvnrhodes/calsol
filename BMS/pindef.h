@@ -10,19 +10,18 @@
 
 /* Pinouts */
 // Relays
-#define BATTERY_RELAY  18 // Check this!
-#define SOLAR_RELAY   19 // Check this!
-#define RELAY3         20  // No led
-#define LVRELAY        22
+#define BATTERY_RELAY 19
+#define SOLAR_RELAY 18
+#define LV_RELAY 22
 // LEDs
-#define LEDFAIL  23
-#define CANINT    3
+#define LEDFAIL 23
+#define CANINT 3
 // Voltage/Current readings
 #define C_GND        5
 #define C_BATTERY    3
 #define C_SOLAR      4
-#define V_BATTERY    1
-#define V_MOTOR      2
+#define V_BATTERY    2
+#define V_MOTOR      1
 // Battery Box Fans
 #define FAN1     24
 #define FAN2     25
@@ -32,11 +31,8 @@
 #define POWER_U8  14
 #define POWER_U3  15
 // I/O
-#define OUT_BUZZER    21
-#define KEY_SWITCH   2
-#define IN_SONG1       1   // SONG 1 (Tetris)
-#define IN_SONG2       0   // SONG 2 (Bad Romance)
-#define IO_T4         31   // Analog 0
+#define OUT_BUZZER 21
+#define KEY_SWITCH 2
 // BPS
 #define LT_CS         11
 
@@ -64,6 +60,12 @@ const prog_char reason_BPS_OVERVOLT[]
     PROGMEM = "BPS, Battery Module Overvoltage";
 const prog_char reason_BPS_OVERTEMP[]
     PROGMEM = "BPS, Battery Module Overtemperature";
+const prog_char reason_S_ENABLE_CHARGING[]
+    PROGMEM = "Safe to charge, enabling charging";
+const prog_char reason_S_DISABLE_CHARGING[]
+    PROGMEM = "Unsafe to charge, disabling charging";
+const prog_char reason_S_COMPLETED_PRECHARGE[]
+    PROGMEM = "Completed precharge, ready to drive";
 const prog_char reason_UNKNOWN[]
     PROGMEM = "Unknown Shutdown Code";
 
@@ -84,6 +86,9 @@ PROGMEM const char *error_code_lookup[] = {
   reason_BPS_UNDERVOLT,
   reason_BPS_OVERVOLT,
   reason_BPS_OVERTEMP,
+  reason_S_ENABLE_CHARGING,
+  reason_S_DISABLE_CHARGING,
+  reason_S_COMPLETED_PRECHARGE,
   reason_UNKNOWN
 };
 
@@ -99,6 +104,9 @@ enum error_codes {
   BPS_UNDERVOLT,
   BPS_OVERVOLT,
   BPS_OVERTEMP,
+  S_ENABLE_CHARGING,
+  S_DISABLE_CHARGING,
+  S_COMPLETED_PRECHARGE,
   UNKNOWN_SHUTDOWN // Must always be last one
 };
 
