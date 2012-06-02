@@ -1,8 +1,10 @@
 /* CalSol - UC Berkeley Solar Vehicle Team
  * pitches.h - BMS Module
  * Purpose: Stores pitches for song playing
+ * In May 2012, Steven Rhodes converted this 
+ * to a librart for playing songs.
  * Author(s): Brian Duffy, Steven Rhodes
- * Date: May 8 2012
+ * Date: May 27 2012
  */
 
 /*************************************************
@@ -11,6 +13,14 @@
 
 #ifndef _PITCHES_H_
 #define _PITCHES_H_
+
+
+#include <WProgram.h>
+#include <avr/pgmspace.h>
+
+//#define PITCHES_DEBUG
+#define PITCHES_H_USE_TONE
+
 
 #define SILENCE  0
 #define NOTE_B0  31
@@ -103,7 +113,7 @@
 #define NOTE_D8  4699
 #define NOTE_DS8 4978
 
-const prog_uint16_t kFullyBootedBeep[][2] = {
+const uint16_t kFullyBootedBeep[][2] = {
   {NOTE_A4, 100},
   {SILENCE, 50},
   {NOTE_A4, 100},
@@ -113,7 +123,7 @@ const prog_uint16_t kFullyBootedBeep[][2] = {
   {SILENCE, 0}
 };
 
-const prog_uint16_t kStartupBeep[][2] = {
+const uint16_t kStartupBeep[][2] = {
   {NOTE_A3, 100},
   {SILENCE, 50},
   {NOTE_E4, 100},
@@ -121,7 +131,7 @@ const prog_uint16_t kStartupBeep[][2] = {
   {SILENCE, 0}
 };
 
-const prog_uint16_t kShutdownBeep[][2] = {
+const uint16_t kShutdownBeep[][2] = {
   {NOTE_E4, 100},
   {SILENCE, 50},
   {NOTE_A3, 100},
@@ -129,7 +139,7 @@ const prog_uint16_t kShutdownBeep[][2] = {
   {SILENCE, 0}
 };
 
-const prog_uint16_t kLowVoltageBeep[][2] = {
+const uint16_t kLowVoltageBeep[][2] = {
   {NOTE_A3, 100},
   {NOTE_C4, 100},
   {NOTE_A3, 100},
@@ -138,7 +148,7 @@ const prog_uint16_t kLowVoltageBeep[][2] = {
   {SILENCE, 0}
 };
 
-const prog_uint16_t kHighVoltageBeep[][2] = {
+const uint16_t kHighVoltageBeep[][2] = {
   {NOTE_C4, 100},
   {NOTE_A3, 100},
   {NOTE_C4, 100},
@@ -147,7 +157,7 @@ const prog_uint16_t kHighVoltageBeep[][2] = {
   {SILENCE, 0}
 };
 
-const prog_uint16_t kHighTemperatureBeep[][2] = {
+const uint16_t kHighTemperatureBeep[][2] = {
   {NOTE_C4, 100},
   {NOTE_D4, 100},
   {NOTE_E4, 100},
@@ -156,13 +166,21 @@ const prog_uint16_t kHighTemperatureBeep[][2] = {
   {SILENCE, 0}
 };
 
+const uint16_t kMissingLtCommunicationBeep[][2] = {
+  {NOTE_C4, 100},
+  {SILENCE, 200},
+  {NOTE_C4, 100},
+  {SILENCE, 500},
+
+  {SILENCE, 0}
+};
 
 class Song {
  public:
-  Song(int);
+  Song(byte);
 
   /* Start playing the chosen song */
-  void PlaySong(const prog_uint16_t **);
+  void PlaySong(const prog_uint16_t[][2]);
 
   /* Continue playing the chosen song.  Should be called every 25ms */
   void KeepPlaying(void);
@@ -171,10 +189,11 @@ class Song {
   bool IsPlaying(void);
 
  private:
-  char buzzer_;
-  unsigned int note_start_time_;
-  unsigned int note_duration_;
-  prog_uint16_t song_[][];
+  byte buzzer_;
+  int note_number_;
+  unsigned long note_start_time_;
+  uint16_t note_duration_;
+  const prog_uint16_t (*song_)[2];
 };
 
 #endif

@@ -23,36 +23,39 @@
 #define NUM_OF_AVERAGES 3
 
 /* Magic Threshold Numbers */
-#define OVERTEMP_CUTOFF 60.0
-#define OVERTEMP_WARNING 55.0
-#define TEMPERATURE_OK_TO_CHARGE 43.5
-#define OVERTEMPERATURE_NO_CHARGE 44.0
-#define CHARGING_OVERTEMP_CUTOFF 45.0
-#define CHARGING_OVERTEMP_WARNING 44.5
-#define MODULE_OVERVOLTAGE_CUTOFF 4.2
-#define MODULE_OVERVOLTAGE_WARNING 4.1
-#define MODULE_UNDERVOLTAGE_CUTOFF 2.5
-#define MODULE_UNDERVOLTAGE_WARNING 2.6
-#define OVERVOLTAGE_CUTOFF 4.2
-#define OVERVOLTAGE_WARNING 4.1
-#define UNDERVOLTAGE_CUTOFF 2.5
-#define UNDERVOLTAGE_WARNING 2.6
-#define OVERCURRENT_CUTOFF 100
-#define CHARGING_OVERCURRENT_CUTOFF -45000
-#define MOTOR_MINIMUM_VOLTAGE 90
-#define MOTOR_MAXIMUM_DELTA 10
+#define OVERTEMP_CUTOFF 60.0  // in Celcius
+#define OVERTEMP_WARNING 55.0  // in Celcius
+#define CHARGING_OVERTEMP_CUTOFF 45.0  // in Celcius
+#define CHARGING_OVERTEMP_WARNING 44.5  // in Celcius
+#define OVERTEMPERATURE_NO_CHARGE 44.0  // in Celcius
+#define TEMPERATURE_OK_TO_CHARGE 43.5  // in Celcius
+#define MODULE_OVERVOLTAGE_CUTOFF 2800  // 4.2V, 1.5mV increments
+#define MODULE_OVERVOLTAGE_WARNING 2760  // 4.15V, 1.5mV increments
+#define MODULE_UNDERVOLTAGE_WARNING 1870  // 2.8V, 1.5mV increments
+#define MODULE_UNDERVOLTAGE_CUTOFF 1800  // 2.7V, 1.5mV increments
+#define OVERVOLTAGE_CUTOFF 13860  // 138.6V, in 10mV increments
+#define OVERVOLTAGE_WARNING 13695  // 136.95V, in 10mV increments
+#define UNDERVOLTAGE_WARNING 9240  // 92.4V, in 10mV increments
+#define UNDERVOLTAGE_CUTOFF 8910  // 89.1V, in 10mV increments
+#define DISCHARGING_OVERCURRENT_CUTOFF 4500  // 45A, in 10mA increments
+#define CHARGING_OVERCURRENT_CUTOFF -4500  // -45A, in 10mA increments
+#define CHARGING_THRESHOLD 100  // -1A, in 10mA increments
+#define MOTOR_MINIMUM_VOLTAGE 9000 // 90V, in 10mV increments
+#define MOTOR_MAXIMUM_DELTA 2000 // 20V, in 10mV increments
 
 /* Magic Conversion Numbers */
 #define LT_VOLT_TO_FLOAT 0.0015
-#define LT_THIRD_TEMP_TO_FLOAT 0.1875// Converts to Kelvin
+#define LT_THIRD_TEMP_TO_FLOAT 0.1875  // Converts to Kelvin
 #define THERM_B 3988
 #define CELCIUS_KELVIN_BIAS 273.15
 #define ROOM_TEMPERATURE 298.15
 #define V_INF 3.11  // Voltage at 0 Kelvin
-#define ONE_MEG_RESISTOR 1002958
-#define THREE_K_RESISTOR 2958
-#define CONVERT_TO_MILLIAMPS(x) 
-#define CONVERT_TO_MILLIVOLTS(x) ((x * ONE_MEG_RESISTOR) / THREE_K_RESISTOR) 
+#define R_INF 0.00000155921// exp(-THERM_B / ROOM_TEMPERATURE), precalculated for speed
+#define VOLTAGE_NUMERATOR 100000
+#define VOLTAGE_DENOMINATOR 2958
+#define CONVERT_THIRD_TO_CELCIUS(x) (x * LT_THIRD_TEMP_TO_FLOAT - CELCIUS_KELVIN_BIAS)
+#define CONVERT_TO_MILLIAMPS(x) (x * 40)
+#define CONVERT_TO_MILLIVOLTS(x) ((x * VOLTAGE_NUMERATOR) / (VOLTAGE_DENOMINATOR)) // 10mV/unit
 
 /* Times (in ms) for how often to do actions */
 #define DATA_TIME_LENGTH 200
@@ -61,7 +64,7 @@
 #define SONG_TIME_LENGTH 25
 
 /* LT Boards */
-const char kLTNumOfCells[] = {10, 12, 11};  // Check this!
+const char kLTNumOfCells[] = {10, 12, 11};
 const byte kBoardAddress[] = {0x80, 0x81, 0x82};
 #define WRCFG 0x01   // Write config
 #define RDCFG 0x02   // Read config
@@ -178,33 +181,33 @@ void SendHeartbeat(void);
  * Updates the car data with fresh values from the sensors and the LT boards
  * Call this function once every 200ms or so.
  *
- * @param CarDataInt *car_data The data to be updated.
+ * @param CarDataInt * The data to be updated.
  */
-void GetCarData(CarDataInt *car_data);
+void GetCarData(CarDataInt *);
 
 /***
  * Checks to see if we've hit any limits that we should flag.
  *
- * @param Flags *flags The flags we care about
- * @param CarDataInt *car_data The data from the car.
+ * @param Flags * The flags we care about
+ * @param CarDataInt * The data from the car.
  */
-void GetFlags(Flags *flags, const CarDataInt *car_data);
+void GetFlags(Flags *, const CarDataInt *);
 
 /***
  * Checks what mode we're in based on the flags.
  *
- * @param Flags *car_flags The flags about the car
+ * @param Flags * The flags about the car
  * @return CarState An enum specifying what state we're in
  */
-CarState GetCarState(const Flags *flags);
+CarState GetCarState(const Flags *);
 
 /***
  * Does the appropriate conversions to change CarDataInt into CarDataFloat
  *
- * @param CarDataFloat *out The output data
- * @param CarDataInt *in The input data
+ * @param CarDataFloat * The output data
+ * @param CarDataInt * The input data
  */
-void ConvertCarData(CarDataFloat *out, const CarDataInt *in);
+void ConvertCarData(CarDataFloat *, const CarDataInt *);
 
 /***
  * This function will both turn off the contactor for the solar cells and send
@@ -252,10 +255,10 @@ signed int GetSolarCellCurrent(void);
  * This only works for arrays of size 3 for now.  A future change would hopefully make it work for
  * arrays of size NUM_OF_AVERAGES
  *
- * @param int array[] Array to parse
+ * @param int Array to parse
  * @return Middle value from array
  */
-signed int GetIntMedian(const signed int * array);
+signed int GetIntMedian(const signed int *);
 
 /***
  * Get the middle values from a struct of LT data
@@ -263,51 +266,49 @@ signed int GetIntMedian(const signed int * array);
  * This function relies on GetMedian, so it only works for 3 averages until the
  * other function is updated.
  *
- * @param LTData with all median values
- * @param LTMultipleData * array Struct to parse
+ * @param LTData *Struct to fill with all median values
+ * @param LTMultipleData * Struct to parse
  */
-void GetLtDataMedian(LTData median, const LTMultipleData * array);
+void GetLtDataMedian(LTData *, const LTMultipleData *);
 
 /***
  * Add a LTData to a LTMultipleData.
  *
- * @param LTMultipleData mult The struct we add the data to.
- * @param LTData reading The reading we want to add.
+ * @param LTMultipleData The struct we add the data to.
+ * @param LTData The reading we want to add.
  */
-void AddReading(LTMultipleData * mult, const LTData * reading);
+void AddReading(LTMultipleData *, const LTData *);
 
 /***
  * Fetches the data from a LT Module
  *
- * @param LT_Data *new_data The data fetched from the LT Board (grabbing the median)
- * @param char board_num Which board to read from
- * @param LT_Multiple_Data * averaging_data The data used to figure out the
+ * @param LT_Data * The data fetched from the LT Board (grabbing the median)
+ * @param char Which board to read from
+ * @param LT_Multiple_Data * The data used to figure out the
  * rolling median
  */
-void GetLtBoardData(LTData *new_data, byte board_num,
-    const LTMultipleData * avg_data);
+void GetLtBoardData(LTData *, byte, LTMultipleData *);
 
 /***
  * Sends a CAN Message with LT data.
  *
- * @param LT_Data * data The data to use for the CAN Message
+ * @param LT_Data * The data to use for the CAN Message
  */
-void SendLtBoardCanMessage(const LTData * data);
+void SendLtBoardCanMessage(const LTData *);
 
 /***
  * Sends a CAN Message with general car data.
  *
- * @param CarDataFloat * data The data to use for the CAN Message
- * @return CanMessage The message to send to CAN
+ * @param CarDataFloat * The data to use for the CAN Message
  */
-void SendGeneralDataCanMessage(const CarDataFloat * data);
+void SendGeneralDataCanMessage(const CarDataFloat *);
 
 /***
  * Sends a CAN Message to send out any errors.
  *
- * @param Flags *flags The flags to use for the CAN Message
+ * @param Flags * The flags to use for the CAN Message
  */
-void SendErrorCanMessage(Flags *flags);
+void SendErrorCanMessage(Flags *);
 
 /***
  * Shuts down car.
@@ -337,72 +338,71 @@ inline void SpiEnd(void) {
 /***
  * Send data over SPI
  *
- * @param byte * data Data to send over SPI
- * @param int length The length of the message we want to send
+ * @param byte * Data to send over SPI
+ * @param int The length of the message we want to send
  */
-void SendToSpi(const byte * data, int length);
+void SendToSpi(const byte *, int);
 
 /***
  * Get data over SPI
  *
- * @param byte * data Area to store data received
- * @param byte info Byte to send when requesting data
- * The length of the message we want to recieve
+ * @param byte * Area to store data received
+ * @param byte Byte to send when requesting data
+ * @param int The length of the message we want to recieve
  */
-void GetFromSpi(byte * data, byte info, int length);
+void GetFromSpi(byte *, byte, int);
 
 /***
  * Turn the data from the LT Boards into a readable form
  *
- * @param LTData *data The place to store the data
- * @param byte voltages[] The voltages fetched from SPI
- * @param byte temperatures[] The temperatures fetchd from SPI
+ * @param LTData * The place to store the data
+ * @param byte * The voltages fetched from SPI
+ * @param byte * The temperatures fetched from SPI
  */
-void ParseSPIData(LTData *data, const byte voltages[], 
-    const byte temperatures[]);
+void ParseSpiData(LTData *, const byte *, const byte *);
 
 /***
  * Read off the PROGMEM to determine what string to print.
  *
- * @param enum error_codes code The code to interpret as a message.
+ * @param enum error_codes The code to interpret as a message.
  */
-void PrintErrorMessage(enum error_codes code);
+void PrintErrorMessage(enum error_codes);
 
 /**
  * Picks out the highest voltage from the data by iterating through all of it.
  *
- * @param LTData *board The boards we're inspecting
+ * @param LTData * The boards we're inspecting
  * @return int The highest voltage that we find.
  */
-int HighestVoltage(const LTData *board);
+int HighestVoltage(const LTData *);
 
 /**
  * Picks out the lowest voltage from the data by iterating through all of it.
  *
- * @param LTData *board The boards we're inspecting
+ * @param LTData * The boards we're inspecting
  * @return int The lowest voltage that we find.
  */
-int LowestVoltage(const LTData *board);
+int LowestVoltage(const LTData *);
 
 /**
  * Picks out the highest temperature from the data by iterating through all of it.
  *
- * @param LTData *board The boards we're inspecting
+ * @param LTData * The boards we're inspecting
  * @return int The highest temperature that we find.
  */
-float HighestTemperature(const LTData *board);
+float HighestTemperature(const LTData *);
 
 /**
  * Uses the B equation for thermistors to be able to get the temperature data
  * from the first two readings of the LT Boards.
  *
- * @param int temp The temperature as an integer
+ * @param int The temperature as an integer
  * @return float The temperature as a float
  */
-float ToTemperature(int temp);
+float ToTemperature(int);
 
 /** Used for retrieving error code on LTC603 chips **/
-byte GetPEC(const byte *din, int n);
+byte GetPEC(const byte *, int);
 
 
 #endif  // BMS_H

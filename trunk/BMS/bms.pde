@@ -5,9 +5,11 @@
  * Date: May 1 2012
  */
 
-// #define CAN_DEBUG
-// #define VERBOSE
-// #define SPI_DEBUG
+ #define CRITICAL_MESSAGES
+ //#define CAN_DEBUG
+ //#define SPI_DEBUG
+ //#define VERBOSE
+ //#define FLAGS
 
 #include <SPI.h>
 #include <EEPROM.h>
@@ -25,13 +27,14 @@ long heartbeat_time;
 long battery_time;
 long song_time;
 
-// Hackish, but I need to maintain a counter for this somewhere
+// Hackish, but I need to maintain a counter for this somewhere.  Used in loop().
 byte lt_counter = 0;
 
 // Only used to average out readings from LT boards
 LTMultipleData averaging_data[NUM_OF_LT_BOARDS];
 
 void setup() {
+   Serial.begin(9600);
    InitPins();
    InitSpi();
    InitLtBoardData();
@@ -48,8 +51,8 @@ void loop() {
     GetFlags(&flags, &car_data);
     car_state = GetCarState(car_state, &flags);
     #ifdef VERBOSE
-      print("Car State: ");
-      println(car_state);
+      Serial.print("Car State: ");
+      Serial.println(car_state);
     #endif
     switch(car_state) {
       case TURN_OFF:
@@ -75,12 +78,14 @@ void loop() {
         break;
     }
     if (!buzzer.IsPlaying()) {
-      if (flags.battery_overvoltage_warning || flags.module_undervoltage_warning) {
+      if (flags.module_overvoltage_warning) {
         buzzer.PlaySong(kHighVoltageBeep);
-      } else if (flags.battery_undervoltage_warning || flags.module_undervoltage_warning) {
+      } else if (flags.module_undervoltage_warning) {
         buzzer.PlaySong(kLowVoltageBeep);
       } else if (flags.battery_overtemperature_warning) {
         buzzer.PlaySong(kHighTemperatureBeep);
+      } else if (flags.missing_lt_communication) {
+        buzzer.PlaySong(kMissingLtCommunicationBeep);
       }
     }
     CarDataFloat float_data;
@@ -93,6 +98,12 @@ void loop() {
     // We send out LT CAN messages one at a time to avoid overloading CAN
     if (car_data.lt_board[lt_counter].is_valid) {
       SendLtBoardCanMessage(car_data.lt_board + lt_counter, lt_counter);
+    } else {
+      #ifdef CAN_DEBUG
+        Serial.print("CAN: no LT Board ");
+        Serial.print(lt_counter, DEC);
+        Serial.println(" comm, no msg sent");
+      #endif
     }
     lt_counter = (lt_counter + 1) % NUM_OF_LT_BOARDS;
     battery_time = time;
@@ -105,14 +116,11 @@ void loop() {
   }
 
   if (time - heartbeat_time > HEARTBEAT_TIME_LENGTH) {
-    Serial.println("Hello World"); // Delete this soon
     #ifdef CAN_DEBUG
-      Serial.print("Can RX: ");
+      Serial.print("CAN: RX=");
       Serial.print(Can.rxError());
-      Serial.print(" TX: ");
-      Serial.print(Can.txError());
-      Serial.print(" Error Flags: ");
-      Serial.println(Can._mcp2515.read(EFLG), HEX);
+      Serial.print(", TX=");
+      Serial.println(Can.txError());
     #endif
     SendHeartbeat();
     heartbeat_time = time;
@@ -126,17 +134,19 @@ void InitEEPROM(void) {
   if (memory_index > NUM_OF_ERROR_MESSAGES) {
     memory_index = 1;
   }
-  Serial.print("Last shutdown: ");
-  PrintErrorMessage((enum error_codes) EEPROM.read(memory_index));
+  #ifdef CRITICAL_MESSAGES
+    Serial.print("Last shutdown: ");
+    PrintErrorMessage((enum error_codes) EEPROM.read(memory_index));
+  #endif
   #ifdef VERBOSE
     Serial.println("Earlier shutdown messages:");
-    for (i = memory_index - 1; i != memory_index; --i) {
+    for (int i = memory_index - 1; i != memory_index; --i) {
       if (i == 0) {
-        i = NUM_OF_ERROR_MESSAGES);
+        i = NUM_OF_ERROR_MESSAGES;
       }
       Serial.print(i);
       Serial.print(": ");
-      PrintErrorMessage((enum error_codes) EEPROM.read(memory_index))
+      PrintErrorMessage((enum error_codes) EEPROM.read(memory_index));
     }
   #endif
   memory_index = (memory_index % NUM_OF_ERROR_MESSAGES) + 1;
@@ -148,39 +158,32 @@ void InitPins(void) {
   pinMode(OUT_BUZZER, OUTPUT);
   pinMode(BATTERY_RELAY, OUTPUT);
   pinMode(SOLAR_RELAY, OUTPUT);
-  pinMode(RELAY3, OUTPUT); // DELETE?
-  pinMode(LVRELAY, OUTPUT);
-  pinMode(LEDFAIL, OUTPUT); // DELETE?
-  pinMode(IO_T4, OUTPUT); // DELETE?
+  pinMode(LV_RELAY, OUTPUT);
+  pinMode(LEDFAIL, OUTPUT);
   pinMode(LT_CS, OUTPUT);
   pinMode(FAN1, OUTPUT);
   pinMode(FAN2, OUTPUT);
   pinMode(KEY_SWITCH, INPUT);
-  pinMode(IN_SONG1, INPUT); // DELETE?
-  pinMode(IN_SONG2, INPUT); // DELETE?
   pinMode(V_BATTERY, INPUT);
   pinMode(V_MOTOR, INPUT);
   pinMode(C_BATTERY, INPUT);
+  pinMode(C_SOLAR, INPUT);
+  pinMode(C_GND, INPUT);
 
   digitalWrite(OUT_BUZZER, LOW);
   digitalWrite(BATTERY_RELAY, LOW);
   digitalWrite(SOLAR_RELAY, LOW);
-  digitalWrite(RELAY3, LOW); // DELETE?
-  digitalWrite(LVRELAY, LOW);
-  digitalWrite(LEDFAIL, LOW); // DELETE?
+  digitalWrite(LV_RELAY, LOW);
+  digitalWrite(LEDFAIL, LOW);
   digitalWrite(LT_CS, HIGH);
   digitalWrite(FAN1, LOW);
   digitalWrite(FAN2, LOW);
   digitalWrite(KEY_SWITCH, HIGH);
-  digitalWrite(IN_SONG1, HIGH); // DELETE?
-  digitalWrite(IN_SONG2, HIGH); // DELETE?
-  digitalWrite(V_BATTERY, HIGH); //DELETE?
-  digitalWrite(V_MOTOR, HIGH); //DELETE?
 }
 
 void InitSpi(void) {
   #ifdef SPI_DEBUG
-    println("Initializing SPI");
+    Serial.println("SPI: Initializing");
   #endif
   SPI.begin();
   SPI.setClockDivider(SPI_CLOCK_DIV64);
@@ -203,10 +206,10 @@ void InitLtBoardData(void) {
       if (j < NUM_OF_AVERAGES) {
         lt_board = lt_avg->data + j;
         for (byte k = 0; k < NUM_OF_VOLTAGES; ++k) {
-          lt_board->voltage[k] = 0x8fff;
+          lt_board->voltage[k] = 0x7fff;
         }
         for (byte k = 0; k < NUM_OF_TEMPERATURES; ++k) {
-          lt_board->temperature[k] = 0x8fff;
+          lt_board->temperature[k] = 0x7fff;
         }
       }
     }
@@ -226,10 +229,11 @@ void InitCan(void) {
 
 void SendHeartbeat(void){
   #ifdef CAN_DEBUG
-    println("Sending Cutoff and BPS Hearbeats");
+    Serial.println("CAN: sent Cutoff, BPS Heartbeat");
   #endif
-  Can.send(CanMessage(CAN_HEART_CUTOFF));
-  Can.send(CanMessage(CAN_HEART_BPS));
+  char data = 0;
+  Can.send(CanMessage(CAN_HEART_CUTOFF, &data, 1));
+  Can.send(CanMessage(CAN_HEART_BPS, &data, 1));
 }
 
 void GetCarData(CarDataInt *car_data) {
@@ -255,14 +259,14 @@ void GetFlags(Flags *flags, const CarDataInt *car_data) {
   flags->battery_undervoltage = car_data->battery_voltage < UNDERVOLTAGE_CUTOFF;
   flags->battery_undervoltage_warning = car_data->battery_voltage < UNDERVOLTAGE_WARNING;
 
-  // TODO(stvn): Check assumptions about negative == charging
-  flags->discharging_overcurrent = car_data->battery_current > OVERCURRENT_CUTOFF;
+  // TODO:(stvn): Test assumption that negative current == charging
+  flags->discharging_overcurrent = car_data->battery_current > DISCHARGING_OVERCURRENT_CUTOFF;
   flags->charging_overcurrent = car_data->battery_current < CHARGING_OVERCURRENT_CUTOFF;
-  flags->batteries_charging = car_data->battery_current < 0;
+  flags->batteries_charging = car_data->battery_current < CHARGING_THRESHOLD;
   
-  flags.motor_precharged = (car_data->motor_voltage > MOTOR_MINUMUM_VOLTAGE) &&
+  flags->motor_precharged = (car_data->motor_voltage > MOTOR_MINIMUM_VOLTAGE) &&
       (car_data->battery_voltage - car_data->motor_voltage < MOTOR_MAXIMUM_DELTA);
-  
+      
   flags->missing_lt_communication = false;
   for (int i = 0; i < NUM_OF_LT_BOARDS; ++i) {
     if (!(car_data->lt_board[i].is_valid)) {
@@ -281,9 +285,9 @@ void GetFlags(Flags *flags, const CarDataInt *car_data) {
     flags->battery_overtemperature = high_temperature > OVERTEMP_CUTOFF;
     flags->battery_overtemperature_warning = high_temperature > OVERTEMP_WARNING;
     flags->charging_overtemperature = high_temperature > CHARGING_OVERTEMP_CUTOFF;
-    flags->charging_overtemperature_warning = high_temperature > CHARGING_OVERTEMP_WARNING;
+    flags->charging_temperature_warning = high_temperature > CHARGING_OVERTEMP_WARNING;
 
-    if (flags->charging_disabled && high_temperature < OK_TO_CHARGE) {
+    if (flags->charging_disabled && high_temperature < TEMPERATURE_OK_TO_CHARGE) {
       flags->charging_disabled = false;
     } else if (!flags->charging_disabled && high_temperature > OVERTEMPERATURE_NO_CHARGE) {
       flags->charging_disabled = true;
@@ -293,111 +297,148 @@ void GetFlags(Flags *flags, const CarDataInt *car_data) {
   }
   
   flags->keyswitch_on = IsKeyswitchOn();
+
+
+  #ifdef FLAGS
+    Serial.println(flags->battery_overvoltage, DEC);
+    Serial.println(flags->battery_overvoltage_warning, DEC);
+    Serial.println(flags->battery_undervoltage, DEC);
+    Serial.println(flags->battery_undervoltage_warning, DEC);
+    Serial.println(flags->discharging_overcurrent, DEC);
+    Serial.println(flags->charging_overcurrent, DEC);
+    Serial.println(flags->batteries_charging, DEC);
+    Serial.println(flags->motor_precharged, DEC);
+    Serial.println(flags->missing_lt_communication, DEC);
+    Serial.println(flags->module_overvoltage, DEC);
+    Serial.println(flags->module_overvoltage_warning, DEC);
+    Serial.println(flags->module_undervoltage, DEC);
+    Serial.println(flags->module_undervoltage_warning, DEC);
+    Serial.println(flags->battery_overtemperature, DEC);
+    Serial.println(flags->battery_overtemperature_warning, DEC);
+    Serial.println(flags->charging_overtemperature, DEC);
+    Serial.println(flags->charging_temperature_warning, DEC);
+    Serial.println(flags->charging_disabled, DEC);
+    Serial.println(flags->too_full_to_charge, DEC);
+    Serial.println(flags->keyswitch_on, DEC);
+  #endif
 }
 
-// There may be too many strings here if we define VERBOSE
 CarState GetCarState(const CarState old_state, const Flags *flags) {
   if (old_state == TURN_OFF) {
-    #ifdef VERBOSE
+    #ifdef CRITICAL_MESSAGES
       Serial.println("Car is shut down");
     #endif
     return CAR_OFF;
   }
-  if (car_state == CAR_ON && !(flags->charging_disabled)) {
-    if (flags->too_full_to_charge || flags->too_hot_to_charge){
-      #ifdef VERBOSE
-        Serial.println("Unsafe to charge, disabling charging");
-      #endif
-      return DISABLE_CHARGING;
-    }
-  }
   if (old_state != CAR_OFF) {
     if (flags->missing_lt_communication) {
-      #ifdef VERBOSE
-        Serial.println("Shutting down, can't talk to an LT Board");
+      #ifdef CRITICAL_MESSAGES
+        // Serial.println("Shutting down, can't talk to an LT Board");
+        PrintErrorMessage(BPS_DISCONNECTED);
       #endif
       EEPROM.write(EEPROM.read(0), BPS_DISCONNECTED);
       return TURN_OFF;
     }
-    if (flags->battery_overvoltage) {
-      #ifdef VERBOSE
-        Serial.println("Shutting down, the battery pack is too high voltage");
+    if (flags->battery_overvoltage && flags->batteries_charging) {
+      #ifdef CRITICAL_MESSAGES
+        // Serial.println("Shutting down, the battery pack is too high voltage");
+        PrintErrorMessage(S_OVERVOLT);
       #endif
       EEPROM.write(EEPROM.read(0), S_OVERVOLT);
       return TURN_OFF;
     }
-    if (flags->battery_undervoltage) {
-      #ifdef VERBOSE
-        Serial.println("Shutting down, the battery pack is too low voltage");
+    if (flags->battery_undervoltage && !flags->motor_precharged) {
+      #ifdef CRITICAL_MESSAGES
+        // Serial.println("Shutting down, the battery pack is too low voltage");
+        PrintErrorMessage(S_UNDERVOLT);
       #endif
       EEPROM.write(EEPROM.read(0), S_UNDERVOLT);
       return TURN_OFF;
     }
+    // TODO(stvn): Calibrate current, then replace this with commented out line.
     if (flags->module_overvoltage) {
-      #ifdef VERBOSE
-        Serial.println("Shutting down, a battery module is too high voltage");
+    // if (flags->module_overvoltage && flags->batteries_charging) {
+      #ifdef CRITICAL_MESSAGES
+        // Serial.println("Shutting down, a battery module is too high voltage");
+        PrintErrorMessage(BPS_OVERVOLT);
       #endif
       EEPROM.write(EEPROM.read(0), BPS_OVERVOLT);
       return TURN_OFF;
     }
-    if (flags->module_undervoltage) {
-      #ifdef VERBOSE
-        Serial.println("Shutting down, a battery module is too low voltage");
+    if (flags->module_undervoltage && !flags->motor_precharged) {
+      #ifdef CRITICAL_MESSAGES
+        // Serial.println("Shutting down, a battery module is too low voltage");
+        PrintErrorMessage(BPS_UNDERVOLT);
       #endif
       EEPROM.write(EEPROM.read(0), BPS_UNDERVOLT);
       return TURN_OFF;
     }
-    if (flags->battery_overcurrent) {
-      #ifdef VERBOSE
-        Serial.println("Shutting down, batteries are putting out too much current");
+    if (flags->discharging_overcurrent) {
+      #ifdef CRITICAL_MESSAGES
+        // Serial.println("Shutting down, batteries are putting out too much current");
+        PrintErrorMessage(S_OVERCURRENT);
       #endif
       EEPROM.write(EEPROM.read(0), S_OVERCURRENT);
       return TURN_OFF;
     }
-    if (flags->battery_charging_overcurrent) {
-      #ifdef VERBOSE
-        Serial.println("Shutting down, batteries are taking in too much current");
+    if (flags->charging_overcurrent) {
+      #ifdef CRITICAL_MESSAGES
+        // Serial.println("Shutting down, batteries are taking in too much current");
+        PrintErrorMessage(S_OVERCURRENT);
       #endif
       EEPROM.write(EEPROM.read(0), S_OVERCURRENT);
       return TURN_OFF;
     }
     if (flags->batteries_charging && flags->charging_overtemperature) {
-      #ifdef VERBOSE
-        Serial.println("Shutting down, batteries charging but too hot to charge");
+      #ifdef CRITICAL_MESSAGES
+        // Serial.println("Shutting down, batteries charging but too hot to charge");
+        PrintErrorMessage(BPS_OVERTEMP);
       #endif
       EEPROM.write(EEPROM.read(0), BPS_OVERTEMP);
       return TURN_OFF;
     }
     if (!(flags->keyswitch_on)) {
-      #ifdef VERBOSE
-        Serial.println("Shutting down, keyswitch in off position");
+      #ifdef CRITICAL_MESSAGES
+        // Serial.println("Shutting down, keyswitch in off position");
+        PrintErrorMessage(KEY_OFF);
       #endif
       EEPROM.write(EEPROM.read(0), KEY_OFF);
       return TURN_OFF;
     }
   }
   if (old_state == TURN_ON) {
-    #ifdef VERBOSE
+    #ifdef CRITICAL_MESSAGES
       Serial.println("Car is on");
     #endif
     return CAR_ON;
   }
   if (old_state == CAR_OFF && flags->keyswitch_on) {
-      #ifdef VERBOSE
+      #ifdef CRITICAL_MESSAGES
         Serial.println("Beginning Precharge");
       #endif
     return IN_PRECHARGE;
   }
   if (old_state == IN_PRECHARGE && flags->motor_precharged) {
-    #ifdef VERBOSE
-      Serial.println("Precharge completed, turning on");
+    #ifdef CRITICAL_MESSAGES
+      // Serial.println("Precharge completed, turning on");
+      PrintErrorMessage(S_COMPLETED_PRECHARGE);
     #endif
     return TURN_ON;
   }
+  if (car_state == CAR_ON && !(flags->charging_disabled)) {
+    if (flags->too_full_to_charge || flags->too_hot_to_charge){
+      #ifdef CRITICAL_MESSAGES
+        // Serial.println("Unsafe to charge, disabling charging");
+        PrintErrorMessage(S_DISABLE_CHARGING);
+      #endif
+      return DISABLE_CHARGING;
+    }
+  }
   if (car_state == CAR_ON && flags->charging_disabled) {
     if (!(flags->too_full_to_charge) && !(flags->too_hot_to_charge)){
-      #ifdef VERBOSE
-        Serial.println("Safe to charge, reenabling charging");
+      #ifdef CRITICAL_MESSAGES
+        // Serial.println("Safe to charge, reenabling charging");
+        PrintErrorMessage(S_ENABLE_CHARGING);
       #endif
       return ENABLE_CHARGING;
     }
@@ -409,15 +450,17 @@ CarState GetCarState(const CarState old_state, const Flags *flags) {
 }
 
 void ConvertCarData(CarDataFloat *out, const CarDataInt *in) {
-  out->battery_voltage = in->battery_voltage / 1000.0;
-  out->motor_voltage = in->motor_voltage / 1000.0;
-  out->battery_current = in->battery_current / 1000.0;
-  out->solar_current = in->solar_current / 1000.0
+  // Everything is in 10mV or 10mA, so we divide by 100 to scale
+  out->battery_voltage = in->battery_voltage / 100.0;
+  out->motor_voltage = in->motor_voltage / 100.0;
+  out->battery_current = in->battery_current / 100.0;
+  out->solar_current = in->solar_current / 100.0;
+}
 
 void DisableCharging (void) {
   #ifdef CAN_DEBUG
-    Serial.print("Not yet implemented");
-    Serial.println("Sending message to prevent regen");
+    Serial.print("CAN: Not yet implemented, ");
+    Serial.println("CAN: sent Prevent Regen Msg");
   #endif
   // TODO(stvn): Send CAN message to prevent regen
   digitalWrite(C_SOLAR, LOW);
@@ -425,15 +468,15 @@ void DisableCharging (void) {
 
 void EnableCharging (void) {
   #ifdef CAN_DEBUG
-    Serial.print("Not yet implemented");
-    Serial.println("Sending message to allow regen");
+    Serial.print("Not yet implemented, ");
+    Serial.println("CAN: sent Allow Regen Msg");
   #endif
   // TODO(stvn): Send CAN message to allow regen
   digitalWrite(C_SOLAR, HIGH);
 }
 
 signed int GetBatteryVoltage(void) {
-  static signed int[] old_readings = {0xffff, 0x8fff, 0xffff};
+  static signed int old_readings[] = {0xffff, 0x7fff, 0xffff};
   static byte ptr = 0;
   
   // We need to make this a long to avoid rounding errors when we scale
@@ -448,7 +491,7 @@ signed int GetBatteryVoltage(void) {
 }
 
 signed int GetMotorVoltage(void) {
-  static signed int[] old_readings = {0xffff, 0x8fff, 0xffff};
+  static signed int old_readings[] = {0xffff, 0x7fff, 0xffff};
   static byte ptr = 0;
   
   long reading = analogRead(V_MOTOR);
@@ -462,10 +505,11 @@ signed int GetMotorVoltage(void) {
 }
 
 signed int GetBatteryCurrent(void) {
-  static signed int[] old_readings = {0xffff, 0x8fff, 0xffff};
+  static signed int old_readings[] = {0xffff, 0x7fff, 0xffff};
   static byte ptr = 0;
   
-  old_readings[ptr] = analogRead(C_BATTERY) - analogRead(C_GND);
+  signed long reading = analogRead(C_BATTERY) - analogRead(C_GND);
+  old_readings[ptr] = CONVERT_TO_MILLIVOLTS(reading);
   ptr = (ptr + 1) % 3;
   #ifdef VERBOSE
     Serial.print("Battery Current: ");
@@ -475,10 +519,11 @@ signed int GetBatteryCurrent(void) {
 }
 
 signed int GetSolarCellCurrent(void) {
-  static signed int[] old_readings = {0xffff, 0x8fff, 0xffff};
+  static signed int old_readings[] = {0xffff, 0x7fff, 0xffff};
   static byte ptr = 0;
   
-  old_readings[ptr] = analogRead(C_SOLAR) - analogRead(C_GND);
+  signed long reading = analogRead(C_BATTERY) - analogRead(C_GND);
+  old_readings[ptr] = CONVERT_TO_MILLIAMPS(reading);
   ptr = (ptr + 1) % 3;
   #ifdef VERBOSE
     Serial.print("Solar Current: ");
@@ -515,7 +560,7 @@ signed int GetIntMedian(const signed int * array) {
   return low;
 }
 
-void GetLtDataMedian(LTData median, const LTMultipleData * array) {
+void GetLtDataMedian(LTData *median, const LTMultipleData * array) {
   int avgs[NUM_OF_AVERAGES];
   for (int i = 0; i < NUM_OF_VOLTAGES; ++i) {
     for (int j = 0; j < NUM_OF_AVERAGES; ++j) {
@@ -536,21 +581,25 @@ void AddReading(LTMultipleData * mult, const LTData * reading) {
   mult->ptr = (mult->ptr + 1) % NUM_OF_AVERAGES;
 }
 
-void GetLtBoardData(LTData *new_data, byte board_num,
-    const LTMultipleData * avg_data) {
+void GetLtBoardData(LTData *new_data, byte board_num, LTMultipleData * avg_data) {
   byte config;
 
   SpiStart();
   SendToSpi(kBoardAddress + board_num, 1);
-  config = RDCFG
-  SendToSpi(&config);
-  byte rconfig[6]
+  config = RDCFG;
+  SendToSpi(&config, 1);
+  byte rconfig[6];
   GetFromSpi(rconfig, RDCFG, 6);
   SpiEnd();
   
   if (rconfig[0] == 0xFF || rconfig[0] == 0x00 || rconfig[0] == 0x02) {
     //  If we get one of these responses, it means the LT board is not communicating.
     new_data->is_valid = false;
+    #ifdef CRITICAL_MESSAGES
+      Serial.print("LT Board ");
+      Serial.print(board_num, DEC);
+      Serial.println(" not responding");
+    #endif
     return;
   }
   
@@ -580,47 +629,72 @@ void GetLtBoardData(LTData *new_data, byte board_num,
   AddReading(avg_data, new_data);
   GetLtDataMedian(new_data, avg_data);
   new_data->is_valid = true;
+  
+  #ifdef VERBOSE
+    Serial.print("LT Board ");
+    Serial.print(board_num);
+    Serial.print("voltages: ");
+    for (int i = 0; i < kLTNumOfCells[board_num]; ++i) {
+      Serial.print(new_data->voltage[i]);
+      Serial.print("(");
+      Serial.print(LT_VOLT_TO_FLOAT * new_data->voltage[i]);
+      Serial.print("), ");
+    }
+    Serial.print("temperatures: ");
+    Serial.print(new_data->temperature[0]);
+    Serial.print("(");
+    Serial.print(ToTemperature(new_data->temperature[0]));
+    Serial.print("), ");
+    Serial.print(new_data->temperature[1]);
+    Serial.print("(");
+    Serial.print(ToTemperature(new_data->temperature[1]));
+    Serial.print("), ");
+    Serial.print(new_data->temperature[2]);
+    Serial.print("(");
+    Serial.print(CONVERT_THIRD_TO_CELCIUS(new_data->temperature[0]));
+    Serial.println(")");
+  #endif
 }
 
 void SendLtBoardCanMessage(const LTData * data, byte board_num) {
   int board_address = CAN_BPS_BASE + board_num * CAN_BPS_MODULE_OFFSET;
   TwoFloats msg;
   #ifdef CAN_DEBUG
-    Serial.print("Sending LtBoardCanMessage ");
-    Serial.print(board_num)
-    Serial.print(", voltages: ");
+    Serial.print("CAN: sent LT Board ");
+    Serial.print(board_num);
+    Serial.print(" msg, v: ");
   #endif
-  for (int i = 0; i < kNumOfCells[board_num]; ++i) {
+  for (int i = 0; i < kLTNumOfCells[board_num]; ++i) {
     msg.f[0] = data->voltage[i] * LT_VOLT_TO_FLOAT;
     #ifdef CAN_DEBUG
       Serial.print(msg.f[0]);
       Serial.print(", ");
     #endif
-    Can.send(CanMessage(board_address + i, msg.c, 4);
+    Can.send(CanMessage(board_address + i, msg.c, 4));
   }
   #ifdef CAN_DEBUG
-    Serial.println(" and some temperatures, too.");
+    Serial.println();
   #endif
   board_address += CAN_BPS_TEMP_OFFSET;
   msg.f[0] = ToTemperature(data->temperature[0]);
-  Can.send(CanMessage(board_address, msg.c, 4);
+  Can.send(CanMessage(board_address, msg.c, 4));
   msg.f[0] = ToTemperature(data->temperature[1]);
-  Can.send(CanMessage(board_address + 1, msg.c, 4);
-  msg.f[0] = data->temperature[2] * LT_THIRD_TEMP_TO_FLOAT - KELVIN_CELCIUS_BIAS;
-  Can.send(CanMessage(board_address + 2, msg.c, 4);
+  Can.send(CanMessage(board_address + 1, msg.c, 4));
+  msg.f[0] = CONVERT_THIRD_TO_CELCIUS(data->temperature[2]);
+  Can.send(CanMessage(board_address + 2, msg.c, 4));
 }
   
 void SendGeneralDataCanMessage(const CarDataFloat * data) {
   TwoFloats msg;
   #ifdef CAN_DEBUG
-    Serial.print("Sending General CAN Message, ");
-    Serial.print("battery voltage: ");
+    Serial.print("CAN: sent Data Msg, ");
+    Serial.print("battery V: ");
     Serial.print(data->battery_voltage);
-    Serial.print(", motor voltage: ");
+    Serial.print(", motor V: ");
     Serial.print(data->motor_voltage);
-    Serial.print(", battery current: ");
+    Serial.print(", battery C: ");
     Serial.print(data->battery_current);
-    Serial.print(", solar current: ");
+    Serial.print(", solar C: ");
     Serial.println(data->solar_current);
   #endif
   msg.f[0] = data->battery_voltage;
@@ -628,7 +702,7 @@ void SendGeneralDataCanMessage(const CarDataFloat * data) {
   Can.send(CanMessage(CAN_CUTOFF_VOLT, msg.c, 8));
   msg.f[0] = data->battery_current;
   msg.f[1] = data->solar_current;
-  Can.send(CanMessage(CAN_CUTOFF_CURR, 8));
+  Can.send(CanMessage(CAN_CUTOFF_CURR, msg.c,  8));
 }  
 
 void SendErrorCanMessage(Flags *flags) {
@@ -645,6 +719,7 @@ void ShutdownCar(const Flags *flags) {
   digitalWrite(POWER_U8, LOW);
   digitalWrite(POWER_U9, LOW);
   digitalWrite(POWER_U10, LOW);
+  buzzer.PlaySong(kShutdownBeep);
 }
 
 void TurnOnCar(void) {
@@ -659,21 +734,40 @@ void TurnOnCar(void) {
   digitalWrite(POWER_U8, HIGH);
   digitalWrite(POWER_U9, HIGH);
   digitalWrite(POWER_U10, HIGH);
+  buzzer.PlaySong(kStartupBeep);
 }
 
 void SendToSpi(const byte * data, int length) {
   for (int i = 0; i < length; ++i) {
     SPI.transfer(data[i]);
   }
+  #ifdef SPI_DEBUG
+    Serial.print("SPI: Sent ");
+    for (int i = 0; i < length; ++i) {
+      Serial.print(data[i], HEX);
+      Serial.print(", ");
+    }
+    Serial.println("end of message");
+  #endif
 }
     
 void GetFromSpi(byte * data, byte info, int length) {
   for (int i = 0; i < length; ++i) {
     data[i] = SPI.transfer(info);
   }
+  #ifdef SPI_DEBUG
+    Serial.print("SPI: With ");
+    Serial.print(info, HEX);
+    Serial.print(", Got ");
+    for (int i = 0; i < length; ++i) {
+      Serial.print(data[i], HEX);
+      Serial.print(", ");
+    }
+    Serial.println("end of message");
+  #endif
 }
 
-void ParseSPIData(LTData *data, const byte voltages[], 
+void ParseSpiData(LTData *data, const byte voltages[], 
     const byte temperatures[]) {
   data->voltage[0] = (voltages[0] & 0xFF) | (voltages[1] & 0x0F) << 8;
   data->voltage[1] = (voltages[1] & 0xF0) >> 4 | (voltages[2] & 0xFF) << 4;
@@ -695,16 +789,16 @@ void ParseSPIData(LTData *data, const byte voltages[],
 void PrintErrorMessage(enum error_codes code) {
   char buffer[MAX_STR_SIZE];
   if (code > UNKNOWN_SHUTDOWN) {
-    code = UNKNOWN_SHUTDOWN);
+    code = UNKNOWN_SHUTDOWN;
   }
   strcpy_P(buffer, (char *)pgm_read_word(&(error_code_lookup[code])));
   Serial.println(buffer);
 }
 
-int HighestVoltage(LTData *board) {
+int HighestVoltage(const LTData *board) {
   int max = 0x00;
   for (int i = 0; i < NUM_OF_LT_BOARDS; ++i) {
-    for (int j = 0; j < kNumOfCells[i]; ++j) {
+    for (int j = 0; j < kLTNumOfCells[i]; ++j) {
       if (max < board[i].voltage[j]) {
         max = board[i].voltage[j];
       }
@@ -713,10 +807,10 @@ int HighestVoltage(LTData *board) {
   return max;
 }
 
-int LowestVoltage(LTData *board) {
-  int min = 0x00;
+int LowestVoltage(const LTData *board) {
+  int min = 0x7fff;
   for (int i = 0; i < NUM_OF_LT_BOARDS; ++i) {
-    for (int j = 0; j < kNumOfCells[i]; ++j) {
+    for (int j = 0; j < kLTNumOfCells[i]; ++j) {
       if (min > board[i].voltage[j]) {
         min = board[i].voltage[j];
       }
@@ -725,7 +819,7 @@ int LowestVoltage(LTData *board) {
   return min;
 }
 
-float HighestTemperature(LTData *board) {
+float HighestTemperature(const LTData *board) {
   float max = 0x00;
   float current;
   for (int i = 0; i < NUM_OF_LT_BOARDS; ++i) {
@@ -737,10 +831,12 @@ float HighestTemperature(LTData *board) {
     if (max < current) {
       max = current;
     }
-    current = board[i].temperature[2] * LT_THIRD_TEMP_TO_FLOAT;
-    if (max < current) {
-      max = current;
-    }
+    // The internal die temperature seems unreliable for now, so let's 
+    // ignore it when determining if we have too high a temperature.
+//    current = CONVERT_THIRD_TO_CELCIUS(board[i].temperature[2]);
+//    if (max < current) {
+//      max = current;
+//    }
   }
   return max;
 }
