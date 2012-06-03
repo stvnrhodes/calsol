@@ -33,6 +33,8 @@
 #define MODULE_OVERVOLTAGE_WARNING 2760  // 4.15V, 1.5mV increments
 #define MODULE_UNDERVOLTAGE_WARNING 1870  // 2.8V, 1.5mV increments
 #define MODULE_UNDERVOLTAGE_CUTOFF 1800  // 2.7V, 1.5mV increments
+#define VOLTAGE_OK_TO_CHARGE 2760  // 4.15V, 1.5mV increments
+#define OVERVOLTAGE_NO_CHARGE 2730  // 4.1V, 1.5mV increments
 #define OVERVOLTAGE_CUTOFF 13860  // 138.6V, in 10mV increments
 #define OVERVOLTAGE_WARNING 13695  // 136.95V, in 10mV increments
 #define UNDERVOLTAGE_WARNING 9240  // 92.4V, in 10mV increments
