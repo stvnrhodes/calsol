@@ -288,12 +288,16 @@ void GetFlags(Flags *flags, const CarDataInt *car_data) {
     flags->charging_temperature_warning = high_temperature > CHARGING_OVERTEMP_WARNING;
 
     if (flags->charging_disabled && high_temperature < TEMPERATURE_OK_TO_CHARGE) {
-      flags->charging_disabled = false;
+      flags->too_hot_to_charge = false;
     } else if (!flags->charging_disabled && high_temperature > OVERTEMPERATURE_NO_CHARGE) {
-      flags->charging_disabled = true;
+      flags->too_hot_to_charge = true;
     }
 
-    flags->too_full_to_charge = flags->module_overvoltage_warning || flags->battery_overvoltage_warning;
+    if (flags->charging_disabled && high_voltage < VOLTAGE_OK_TO_CHARGE) {
+      flags->too_full_to_charge = false;
+    } else if (!flags->charging_disabled && high_voltage > OVERVOLTAGE_NO_CHARGE) {
+      flags->too_full_to_charge = true;
+    }
   }
   
   flags->keyswitch_on = IsKeyswitchOn();
