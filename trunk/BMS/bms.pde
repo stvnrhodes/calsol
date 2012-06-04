@@ -91,6 +91,7 @@ void loop() {
     CarDataFloat float_data;
     ConvertCarData(&float_data, &car_data);
     SendGeneralDataCanMessage(&float_data);
+    SendErrorCanMessage(&flags);
     data_time = time;
   }
 
@@ -710,7 +711,29 @@ void SendGeneralDataCanMessage(const CarDataFloat * data) {
 }  
 
 void SendErrorCanMessage(Flags *flags) {
-  // TODO(stvn): Figure out what to send here
+  char flags_can_data[3];
+  flags_can_data[0] |= flags->battery_overvoltage             << 0;
+  flags_can_data[0] |= flags->battery_overvoltage_warning     << 1;
+  flags_can_data[0] |= flags->battery_undervoltage            << 2;
+  flags_can_data[0] |= flags->battery_undervoltage_warning    << 3;
+  flags_can_data[0] |= flags->module_overvoltage              << 4;
+  flags_can_data[0] |= flags->module_overvoltage_warning      << 5;
+  flags_can_data[0] |= flags->module_undervoltage             << 6;
+  flags_can_data[0] |= flags->module_undervoltage_warning     << 7;
+  flags_can_data[1] |= flags->battery_overtemperature         << 0;
+  flags_can_data[1] |= flags->battery_overtemperature_warning << 1;
+  flags_can_data[1] |= flags->charging_overtemperature        << 2;
+  flags_can_data[1] |= flags->charging_temperature_warning    << 3;
+  flags_can_data[1] |= flags->discharging_overcurrent         << 4;
+  flags_can_data[1] |= flags->charging_overcurrent            << 5;
+  flags_can_data[1] |= flags->too_hot_to_charge               << 6;
+  flags_can_data[1] |= flags->too_full_to_charge              << 7;
+  flags_can_data[2] |= flags->keyswitch_on                    << 0;
+  flags_can_data[2] |= flags->batteries_charging              << 1;
+  flags_can_data[2] |= flags->missing_lt_communication        << 2;
+  flags_can_data[2] |= flags->motor_precharged                << 3;
+  flags_can_data[2] |= flags->charging_disabled               << 4;
+  Can.send(CanMessage(CAN_CUTOFF_NON_CRITICAL_ERROR, flags_can_data, 3))
 }
 
 void ShutdownCar(const Flags *flags) {

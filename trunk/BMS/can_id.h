@@ -29,6 +29,7 @@
 #define CAN_HEART_OTHER3        0x048 
 
 // Cutoff signals
+#define CAN_CUTOFF_NON_CRITICAL_ERROR 0x522
 #define CAN_CUTOFF_VOLT    0x523 
 #define CAN_CUTOFF_CURR    0x524 
 #define CAN_CUTOFF_NORMAL_SHUTDOWN 0x521
