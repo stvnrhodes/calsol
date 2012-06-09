@@ -64,16 +64,18 @@ void loop() {
         buzzer.PlaySong(kFullyBootedBeep);
         break;
       case DISABLE_CHARGING:
-        flags.charging_disabled = true;
+        flags.charging_disabled_too_hot = flags.too_hot_to_charge;
+        flags.charging_disabled_too_full = flags.too_full_to_charge;
         DisableCharging();
         break;
       case ENABLE_CHARGING:
-        flags.charging_disabled = false;
-        EnableCharging();
+        flags.charging_disabled_too_hot = flags.too_hot_to_charge;
+        flags.charging_disabled_too_full = flags.too_full_to_charge;
         break;
       case IN_PRECHARGE:
       case CAR_ON:
       case CAR_OFF:
+      case EMERGENCY_SHUTOFF:
       default:
         break;
     }
@@ -91,7 +93,7 @@ void loop() {
     CarDataFloat float_data;
     ConvertCarData(&float_data, &car_data);
     SendGeneralDataCanMessage(&float_data);
-    SendErrorCanMessage(&flags);
+    SendErrorCanMessage(car_state, &flags);
     data_time = time;
   }
 
@@ -288,15 +290,15 @@ void GetFlags(Flags *flags, const CarDataInt *car_data) {
     flags->charging_overtemperature = high_temperature > CHARGING_OVERTEMP_CUTOFF;
     flags->charging_temperature_warning = high_temperature > CHARGING_OVERTEMP_WARNING;
 
-    if (flags->charging_disabled && high_temperature < TEMPERATURE_OK_TO_CHARGE) {
+    if (flags->charging_disabled_too_hot && high_temperature < TEMPERATURE_OK_TO_CHARGE) {
       flags->too_hot_to_charge = false;
-    } else if (!flags->charging_disabled && high_temperature > OVERTEMPERATURE_NO_CHARGE) {
+    } else if (!flags->charging_disabled_too_hot && high_temperature > OVERTEMPERATURE_NO_CHARGE) {
       flags->too_hot_to_charge = true;
     }
 
-    if (flags->charging_disabled && high_voltage < VOLTAGE_OK_TO_CHARGE) {
+    if (flags->charging_disabled_too_full && high_voltage < VOLTAGE_OK_TO_CHARGE) {
       flags->too_full_to_charge = false;
-    } else if (!flags->charging_disabled && high_voltage > OVERVOLTAGE_NO_CHARGE) {
+    } else if (!flags->charging_disabled_too_full && high_voltage > OVERVOLTAGE_NO_CHARGE) {
       flags->too_full_to_charge = true;
     }
   }
@@ -322,136 +324,145 @@ void GetFlags(Flags *flags, const CarDataInt *car_data) {
     Serial.println(flags->battery_overtemperature_warning, DEC);
     Serial.println(flags->charging_overtemperature, DEC);
     Serial.println(flags->charging_temperature_warning, DEC);
-    Serial.println(flags->charging_disabled, DEC);
+    Serial.println(flags->charging_disabled_too_hot, DEC);
+    Serial.println(flags->charging_disabled_too_full, DEC);
     Serial.println(flags->too_full_to_charge, DEC);
     Serial.println(flags->keyswitch_on, DEC);
   #endif
 }
 
 CarState GetCarState(const CarState old_state, const Flags *flags) {
-  if (old_state == TURN_OFF) {
+  // stvn: See state diagram to understand what this is doing
+  switch(old_state) {
+ 
+    case TURN_OFF:
+      #ifdef CRITICAL_MESSAGES
+        Serial.println("Car is shut down");
+      #endif
+      return CAR_OFF;
+ 
+    case TURN_ON:
+      if (IsCriticalError(flags)) {
+        return EMERGENCY_SHUTOFF;
+      }
+      #ifdef CRITICAL_MESSAGES
+        Serial.println("Car is on");
+      #endif
+      return CAR_ON;
+ 
+    case DISABLE_CHARGING:
+      if (IsCriticalError(flags)) {
+        return EMERGENCY_SHUTOFF;
+      }
+      return CAR_ON;      
+
+    case ENABLE_CHARGING:
+      if (IsCriticalError(flags)) {
+        return EMERGENCY_SHUTOFF;
+      }
+      return CAR_ON;      
+
+    case CAR_ON:
+      if (IsCriticalError(flags)) {
+        return EMERGENCY_SHUTOFF;
+      }
+      if ((flags->too_hot_to_charge && !flags->charging_disabled_too_hot) ||
+          (flags->too_full_to_charge && !flags->charging_disabled_too_full)) {
+        #ifdef CRITICAL_MESSAGES
+          PrintErrorMessage(S_DISABLE_CHARGING);
+        #endif
+        return DISABLE_CHARGING;
+      }
+      if ((!flags->too_hot_to_charge && !flags->too_full_to_charge) &&
+          (flags->charging_disabled_too_hot || flags->charging_disabled_too_full)) {
+        #ifdef CRITICAL_MESSAGES
+          PrintErrorMessage(S_ENABLE_CHARGING);
+        #endif
+        return ENABLE_CHARGING;
+      }
+      if (!flags->keyswitch_on) {
+        return TURN_OFF;
+      }
+      return CAR_ON;
+
+    case EMERGENCY_SHUTOFF:
+      if (!flags->keyswitch_on) {
+        return CAR_OFF;
+      }
+      return EMERGENCY_SHUTOFF;
+
+    case IN_PRECHARGE:
+      if (IsCriticalError(flags)) {
+        return EMERGENCY_SHUTOFF;
+      }
+      if (!flags->keyswitch_on) {
+        return TURN_OFF;
+      }
+      if (flags->motor_precharged) {
+        #ifdef CRITICAL_MESSAGES
+          PrintErrorMessage(S_COMPLETED_PRECHARGE);
+        #endif
+        return TURN_ON;
+      }
+      return IN_PRECHARGE;
+
+    case CAR_OFF:
+    default:
+      if (flags->keyswitch_on) {
+        return IN_PRECHARGE;
+      }
+      return CAR_OFF;
+  }
+}
+
+int IsCriticalError(const Flags *flags) {
+  if (flags->missing_lt_communication) {
     #ifdef CRITICAL_MESSAGES
-      Serial.println("Car is shut down");
+      PrintErrorMessage(BPS_DISCONNECTED);
     #endif
-    return CAR_OFF;
+    EEPROM.write(EEPROM.read(0), BPS_DISCONNECTED);
+    return 1;
   }
-  if (old_state != CAR_OFF) {
-    if (flags->missing_lt_communication) {
-      #ifdef CRITICAL_MESSAGES
-        // Serial.println("Shutting down, can't talk to an LT Board");
-        PrintErrorMessage(BPS_DISCONNECTED);
-      #endif
-      EEPROM.write(EEPROM.read(0), BPS_DISCONNECTED);
-      return TURN_OFF;
-    }
-    if (flags->battery_overvoltage && flags->batteries_charging) {
-      #ifdef CRITICAL_MESSAGES
-        // Serial.println("Shutting down, the battery pack is too high voltage");
-        PrintErrorMessage(S_OVERVOLT);
-      #endif
-      EEPROM.write(EEPROM.read(0), S_OVERVOLT);
-      return TURN_OFF;
-    }
-    if (flags->battery_undervoltage && !flags->motor_precharged) {
-      #ifdef CRITICAL_MESSAGES
-        // Serial.println("Shutting down, the battery pack is too low voltage");
-        PrintErrorMessage(S_UNDERVOLT);
-      #endif
-      EEPROM.write(EEPROM.read(0), S_UNDERVOLT);
-      return TURN_OFF;
-    }
-    // TODO(stvn): Calibrate current, then replace this with commented out line.
-    if (flags->module_overvoltage) {
-    // if (flags->module_overvoltage && flags->batteries_charging) {
-      #ifdef CRITICAL_MESSAGES
-        // Serial.println("Shutting down, a battery module is too high voltage");
-        PrintErrorMessage(BPS_OVERVOLT);
-      #endif
-      EEPROM.write(EEPROM.read(0), BPS_OVERVOLT);
-      return TURN_OFF;
-    }
-    if (flags->module_undervoltage && !flags->motor_precharged) {
-      #ifdef CRITICAL_MESSAGES
-        // Serial.println("Shutting down, a battery module is too low voltage");
-        PrintErrorMessage(BPS_UNDERVOLT);
-      #endif
-      EEPROM.write(EEPROM.read(0), BPS_UNDERVOLT);
-      return TURN_OFF;
-    }
-    if (flags->discharging_overcurrent) {
-      #ifdef CRITICAL_MESSAGES
-        // Serial.println("Shutting down, batteries are putting out too much current");
-        PrintErrorMessage(S_OVERCURRENT);
-      #endif
-      EEPROM.write(EEPROM.read(0), S_OVERCURRENT);
-      return TURN_OFF;
-    }
-    if (flags->charging_overcurrent) {
-      #ifdef CRITICAL_MESSAGES
-        // Serial.println("Shutting down, batteries are taking in too much current");
-        PrintErrorMessage(S_OVERCURRENT);
-      #endif
-      EEPROM.write(EEPROM.read(0), S_OVERCURRENT);
-      return TURN_OFF;
-    }
-    if (flags->batteries_charging && flags->charging_overtemperature) {
-      #ifdef CRITICAL_MESSAGES
-        // Serial.println("Shutting down, batteries charging but too hot to charge");
-        PrintErrorMessage(BPS_OVERTEMP);
-      #endif
-      EEPROM.write(EEPROM.read(0), BPS_OVERTEMP);
-      return TURN_OFF;
-    }
-    if (!(flags->keyswitch_on)) {
-      #ifdef CRITICAL_MESSAGES
-        // Serial.println("Shutting down, keyswitch in off position");
-        PrintErrorMessage(KEY_OFF);
-      #endif
-      EEPROM.write(EEPROM.read(0), KEY_OFF);
-      return TURN_OFF;
-    }
-  }
-  if (old_state == TURN_ON) {
+  // TODO(stvn): Calibrate current, then replace this with commented out line.
+  if (flags->module_overvoltage) {
+  // stvn: We possibly want to do this if we want to be able to turn on the car and it's too high
+  // if (flags->module_overvoltage && flags->batteries_charging) {
     #ifdef CRITICAL_MESSAGES
-      Serial.println("Car is on");
+      PrintErrorMessage(BPS_OVERVOLT);
     #endif
-    return CAR_ON;
+    EEPROM.write(EEPROM.read(0), BPS_OVERVOLT);
+    return 1;
   }
-  if (old_state == CAR_OFF && flags->keyswitch_on) {
-      #ifdef CRITICAL_MESSAGES
-        Serial.println("Beginning Precharge");
-      #endif
-    return IN_PRECHARGE;
-  }
-  if (old_state == IN_PRECHARGE && flags->motor_precharged) {
+  if (flags->module_undervoltage) {
+  // if (flags->module_undervoltage && !flags->motor_precharged) {
     #ifdef CRITICAL_MESSAGES
-      // Serial.println("Precharge completed, turning on");
-      PrintErrorMessage(S_COMPLETED_PRECHARGE);
+      PrintErrorMessage(BPS_UNDERVOLT);
     #endif
-    return TURN_ON;
+    EEPROM.write(EEPROM.read(0), BPS_UNDERVOLT);
+    return 1;
   }
-  if (car_state == CAR_ON && !(flags->charging_disabled)) {
-    if (flags->too_full_to_charge || flags->too_hot_to_charge){
-      #ifdef CRITICAL_MESSAGES
-        // Serial.println("Unsafe to charge, disabling charging");
-        PrintErrorMessage(S_DISABLE_CHARGING);
-      #endif
-      return DISABLE_CHARGING;
-    }
+  if (flags->discharging_overcurrent) {
+    #ifdef CRITICAL_MESSAGES
+      PrintErrorMessage(S_OVERCURRENT);
+    #endif
+    EEPROM.write(EEPROM.read(0), S_OVERCURRENT);
+    return 1;
   }
-  if (car_state == CAR_ON && flags->charging_disabled) {
-    if (!(flags->too_full_to_charge) && !(flags->too_hot_to_charge)){
-      #ifdef CRITICAL_MESSAGES
-        // Serial.println("Safe to charge, reenabling charging");
-        PrintErrorMessage(S_ENABLE_CHARGING);
-      #endif
-      return ENABLE_CHARGING;
-    }
+  if (flags->charging_overcurrent) {
+    #ifdef CRITICAL_MESSAGES
+      PrintErrorMessage(S_OVERCURRENT);
+    #endif
+    EEPROM.write(EEPROM.read(0), S_OVERCURRENT);
+    return 1;
   }
-  if (old_state == DISABLE_CHARGING || old_state == ENABLE_CHARGING) {
-    return CAR_ON;
+  if (flags->batteries_charging && flags->charging_overtemperature) {
+    #ifdef CRITICAL_MESSAGES
+      PrintErrorMessage(BPS_OVERTEMP);
+    #endif
+    EEPROM.write(EEPROM.read(0), BPS_OVERTEMP);
+    return 1;
   }
-  return old_state;
+  return 0;
 }
 
 void ConvertCarData(CarDataFloat *out, const CarDataInt *in) {
@@ -710,30 +721,32 @@ void SendGeneralDataCanMessage(const CarDataFloat * data) {
   Can.send(CanMessage(CAN_CUTOFF_CURR, msg.c,  8));
 }  
 
-void SendErrorCanMessage(Flags *flags) {
-  char flags_can_data[3];
-  flags_can_data[0] |= flags->battery_overvoltage             << 0;
-  flags_can_data[0] |= flags->battery_overvoltage_warning     << 1;
-  flags_can_data[0] |= flags->battery_undervoltage            << 2;
-  flags_can_data[0] |= flags->battery_undervoltage_warning    << 3;
-  flags_can_data[0] |= flags->module_overvoltage              << 4;
-  flags_can_data[0] |= flags->module_overvoltage_warning      << 5;
-  flags_can_data[0] |= flags->module_undervoltage             << 6;
-  flags_can_data[0] |= flags->module_undervoltage_warning     << 7;
-  flags_can_data[1] |= flags->battery_overtemperature         << 0;
-  flags_can_data[1] |= flags->battery_overtemperature_warning << 1;
-  flags_can_data[1] |= flags->charging_overtemperature        << 2;
-  flags_can_data[1] |= flags->charging_temperature_warning    << 3;
-  flags_can_data[1] |= flags->discharging_overcurrent         << 4;
-  flags_can_data[1] |= flags->charging_overcurrent            << 5;
-  flags_can_data[1] |= flags->too_hot_to_charge               << 6;
-  flags_can_data[1] |= flags->too_full_to_charge              << 7;
-  flags_can_data[2] |= flags->keyswitch_on                    << 0;
-  flags_can_data[2] |= flags->batteries_charging              << 1;
-  flags_can_data[2] |= flags->missing_lt_communication        << 2;
-  flags_can_data[2] |= flags->motor_precharged                << 3;
-  flags_can_data[2] |= flags->charging_disabled               << 4;
-  Can.send(CanMessage(CAN_CUTOFF_NON_CRITICAL_ERROR, flags_can_data, 3))
+void SendErrorCanMessage(const CarState car_state, const Flags *flags) {
+  char flags_can_data[4];
+  flags_can_data[0] |= flags->battery_overvoltage              << 0;
+  flags_can_data[0] |= flags->battery_overvoltage_warning      << 1;
+  flags_can_data[0] |= flags->battery_undervoltage             << 2;
+  flags_can_data[0] |= flags->battery_undervoltage_warning     << 3;
+  flags_can_data[0] |= flags->module_overvoltage               << 4;
+  flags_can_data[0] |= flags->module_overvoltage_warning       << 5;
+  flags_can_data[0] |= flags->module_undervoltage              << 6;
+  flags_can_data[0] |= flags->module_undervoltage_warning      << 7;
+  flags_can_data[1] |= flags->battery_overtemperature          << 0;
+  flags_can_data[1] |= flags->battery_overtemperature_warning  << 1;
+  flags_can_data[1] |= flags->charging_overtemperature         << 2;
+  flags_can_data[1] |= flags->charging_temperature_warning     << 3;
+  flags_can_data[1] |= flags->discharging_overcurrent          << 4;
+  flags_can_data[1] |= flags->charging_overcurrent             << 5;
+  flags_can_data[1] |= flags->too_hot_to_charge                << 6;
+  flags_can_data[1] |= flags->too_full_to_charge               << 7;
+  flags_can_data[2] |= flags->keyswitch_on                     << 0;
+  flags_can_data[2] |= flags->batteries_charging               << 1;
+  flags_can_data[2] |= flags->missing_lt_communication         << 2;
+  flags_can_data[2] |= flags->motor_precharged                 << 3;
+  flags_can_data[2] |= flags->charging_disabled_too_hot        << 4;
+  flags_can_data[2] |= flags->charging_disabled_too_full       << 5;
+  flags_can_data[3] = car_state;
+  Can.send(CanMessage(CAN_CUTOFF_NON_CRITICAL_ERROR, flags_can_data, 4));
 }
 
 void ShutdownCar(const Flags *flags) {
@@ -873,8 +886,3 @@ float ToTemperature(int temp) {
   float resist = 1 / (V_INF / voltage - 1);
   return THERM_B / log(resist / R_INF) - CELCIUS_KELVIN_BIAS;
 }
-
-byte GetPEC(const byte * din, int n) {
-  // TODO(stvn): Implement this, not necessary unless we switch chips
-}
-

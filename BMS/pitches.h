@@ -152,7 +152,7 @@ const uint16_t kHighVoltageBeep[][2] = {
   {NOTE_C4, 100},
   {NOTE_A3, 100},
   {NOTE_C4, 100},
-  {SILENCE, 50},
+  {SILENCE, 2000},
 
   {SILENCE, 0}
 };
