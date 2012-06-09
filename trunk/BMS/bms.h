@@ -143,7 +143,9 @@ typedef struct {
   byte batteries_charging: 1;
   byte missing_lt_communication: 1;
   byte motor_precharged: 1;
-  byte charging_disabled: 1;
+  // These two flags are controlled in loop()
+  byte charging_disabled_too_hot: 1;
+  byte charging_disabled_too_full: 1;
 } Flags;
 
 typedef enum {
@@ -153,258 +155,50 @@ typedef enum {
   ENABLE_CHARGING,
   CAR_ON,
   CAR_OFF,
+  EMERGENCY_SHUTOFF,
   IN_PRECHARGE,
 } CarState;
 
 /* Functions */
-
-/***
- * Called at the beginning of the code and sets pins to the appropriate input
- * and output states.
- */
 void InitPins(void);
-
-/***
- * Called at the beginning of the code and sets SPI to the appropriate state
- */
 void InitSpi(void);
-
-/***
- * Initializes the values of LT_Multiple_Data.
- */
 void InitLtBoardData(void);
-
-/***
- * Send the BMS heartbeat (i.e. both BPS and Cutoff).
- */
 void SendHeartbeat(void);
-
-/***
- * Updates the car data with fresh values from the sensors and the LT boards
- * Call this function once every 200ms or so.
- *
- * @param CarDataInt * The data to be updated.
- */
 void GetCarData(CarDataInt *);
-
-/***
- * Checks to see if we've hit any limits that we should flag.
- *
- * @param Flags * The flags we care about
- * @param CarDataInt * The data from the car.
- */
 void GetFlags(Flags *, const CarDataInt *);
-
-/***
- * Checks what mode we're in based on the flags.
- *
- * @param Flags * The flags about the car
- * @return CarState An enum specifying what state we're in
- */
-CarState GetCarState(const Flags *);
-
-/***
- * Does the appropriate conversions to change CarDataInt into CarDataFloat
- *
- * @param CarDataFloat * The output data
- * @param CarDataInt * The input data
- */
+CarState GetCarState(const CarState, const Flags *);
+int IsCriticalError(const Flags *flags);
 void ConvertCarData(CarDataFloat *, const CarDataInt *);
-
-/***
- * This function will both turn off the contactor for the solar cells and send
- * out a message that will hopefully be used to prevent regen braking.
- */
 void DisableCharging (void);
-
-/***
- * This function will turn on the solar cell contactor and broadcast a message
- * that it's okay to use regen braking.
- */
 void EnableCharging (void);
-
-/***
- * Get the battery voltage.
- *
- * @return int The battery voltage.
- */
 signed int GetBatteryVoltage(void);
-
-/***
- * Get the motor voltage.
- *
- * @return int The motor voltage.
- */
 signed int GetMotorVoltage(void);
-
-/***
- * Get the battery current.
- *
- * @return int The battery current.
- */
 signed int GetBatteryCurrent(void);
-
-/***
- * Get the current from the solar cells.
- *
- * @return int The solar cell current.
- */
 signed int GetSolarCellCurrent(void);
-
-/***
- * Get the middle value from an array of ints
- *
- * This only works for arrays of size 3 for now.  A future change would hopefully make it work for
- * arrays of size NUM_OF_AVERAGES
- *
- * @param int Array to parse
- * @return Middle value from array
- */
 signed int GetIntMedian(const signed int *);
-
-/***
- * Get the middle values from a struct of LT data
- *
- * This function relies on GetMedian, so it only works for 3 averages until the
- * other function is updated.
- *
- * @param LTData *Struct to fill with all median values
- * @param LTMultipleData * Struct to parse
- */
 void GetLtDataMedian(LTData *, const LTMultipleData *);
-
-/***
- * Add a LTData to a LTMultipleData.
- *
- * @param LTMultipleData The struct we add the data to.
- * @param LTData The reading we want to add.
- */
 void AddReading(LTMultipleData *, const LTData *);
-
-/***
- * Fetches the data from a LT Module
- *
- * @param LT_Data * The data fetched from the LT Board (grabbing the median)
- * @param char Which board to read from
- * @param LT_Multiple_Data * The data used to figure out the
- * rolling median
- */
 void GetLtBoardData(LTData *, byte, LTMultipleData *);
-
-/***
- * Sends a CAN Message with LT data.
- *
- * @param LT_Data * The data to use for the CAN Message
- */
 void SendLtBoardCanMessage(const LTData *);
-
-/***
- * Sends a CAN Message with general car data.
- *
- * @param CarDataFloat * The data to use for the CAN Message
- */
 void SendGeneralDataCanMessage(const CarDataFloat *);
-
-/***
- * Sends a CAN Message to send out any errors.
- *
- * @param Flags * The flags to use for the CAN Message
- */
-void SendErrorCanMessage(Flags *);
-
-/***
- * Shuts down car.
- */
+void SendErrorCanMessage(const CarState, const Flags *);
 void ShutdownCar(void);
-
-/***
- * Turns on car so that we can drive around
- */
 void TurnOnCar(void);
-
-/***
- * Sends a heartbeat CAN Message
- */
 void SendHeartbeat(void);
-
-/** Used to start talking over SPI. **/
+void SendToSpi(const byte *, int);
+void GetFromSpi(byte *, byte, int);
+void ParseSpiData(LTData *, const byte *, const byte *);
+void PrintErrorMessage(enum error_codes);
+int HighestVoltage(const LTData *);
+int LowestVoltage(const LTData *);
+float HighestTemperature(const LTData *);
+float ToTemperature(int);
 inline void SpiStart(void) {
   digitalWrite(LT_CS, LOW);
 }
-
-/** Used to end talking over SPI. **/
 inline void SpiEnd(void) {
   digitalWrite(LT_CS, HIGH);
 }
-
-/***
- * Send data over SPI
- *
- * @param byte * Data to send over SPI
- * @param int The length of the message we want to send
- */
-void SendToSpi(const byte *, int);
-
-/***
- * Get data over SPI
- *
- * @param byte * Area to store data received
- * @param byte Byte to send when requesting data
- * @param int The length of the message we want to recieve
- */
-void GetFromSpi(byte *, byte, int);
-
-/***
- * Turn the data from the LT Boards into a readable form
- *
- * @param LTData * The place to store the data
- * @param byte * The voltages fetched from SPI
- * @param byte * The temperatures fetched from SPI
- */
-void ParseSpiData(LTData *, const byte *, const byte *);
-
-/***
- * Read off the PROGMEM to determine what string to print.
- *
- * @param enum error_codes The code to interpret as a message.
- */
-void PrintErrorMessage(enum error_codes);
-
-/**
- * Picks out the highest voltage from the data by iterating through all of it.
- *
- * @param LTData * The boards we're inspecting
- * @return int The highest voltage that we find.
- */
-int HighestVoltage(const LTData *);
-
-/**
- * Picks out the lowest voltage from the data by iterating through all of it.
- *
- * @param LTData * The boards we're inspecting
- * @return int The lowest voltage that we find.
- */
-int LowestVoltage(const LTData *);
-
-/**
- * Picks out the highest temperature from the data by iterating through all of it.
- *
- * @param LTData * The boards we're inspecting
- * @return int The highest temperature that we find.
- */
-float HighestTemperature(const LTData *);
-
-/**
- * Uses the B equation for thermistors to be able to get the temperature data
- * from the first two readings of the LT Boards.
- *
- * @param int The temperature as an integer
- * @return float The temperature as a float
- */
-float ToTemperature(int);
-
-/** Used for retrieving error code on LTC603 chips **/
-byte GetPEC(const byte *, int);
 
 
 #endif  // BMS_H
