@@ -50,7 +50,7 @@ void loop() {
     GetCarData(&car_data);
     GetFlags(&flags, &car_data);
     car_state = GetCarState(car_state, &flags);
-    #ifdef VERBOSE
+    #ifdef CRITICAL_MESSAGES
       Serial.print("Car State: ");
       Serial.println(car_state);
     #endif
