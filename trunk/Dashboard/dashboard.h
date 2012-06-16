@@ -6,11 +6,10 @@
  */
 
 
-
 /* User constants */
 #define ACCEL_THRESHOLD_LOW    100
 #define ACCEL_THRESHOLD_HIGH   850
-#define BRAKE_THRESHOLD_LOW    20
+#define BRAKE_THRESHOLD_LOW    10
 #define BRAKE_THRESHOLD_HIGH   330
 #define LIGHT_BLINK_PERIOD     512
 #define CRUISE_SPEED_INCREMENT 0.1
@@ -391,9 +390,8 @@ void driverControl() {
   accel = map(constrained_accel, ACCEL_THRESHOLD_LOW, 
               ACCEL_THRESHOLD_HIGH, 0, 1000) / 1000.0;
               // Fuck it, let's do it live!
-  brake = 0;
- // brake = map(constrained_brake, BRAKE_THRESHOLD_LOW, 
- //             BRAKE_THRESHOLD_HIGH, 0, 1000) / 1000.0;
+  brake = map(constrained_brake, BRAKE_THRESHOLD_LOW, 
+              BRAKE_THRESHOLD_HIGH, 0, 1000) / 1000.0;
               
   // In case we get overcurrent errors, reduce the power we send.
   accel *= overcurrent_scale;
@@ -402,7 +400,7 @@ void driverControl() {
     Serial.print("accel: ");
     Serial.println(accel);
     Serial.print("brake: ");
-    Serial.println(brake);
+    Serial.println(brake_input_raw);
   #endif
   
   // Send CAN data based on current state.
