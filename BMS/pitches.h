@@ -18,8 +18,8 @@
 #include <WProgram.h>
 #include <avr/pgmspace.h>
 
-//#define PITCHES_DEBUG
-#define PITCHES_H_USE_TONE
+// #define PITCHES_DEBUG
+// #define PITCHES_H_USE_TONE
 
 
 #define SILENCE  0
