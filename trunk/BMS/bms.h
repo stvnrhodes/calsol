@@ -44,6 +44,7 @@
 #define CHARGING_THRESHOLD 100  // -1A, in 10mA increments
 #define MOTOR_MINIMUM_VOLTAGE 9000 // 90V, in 10mV increments
 #define MOTOR_MAXIMUM_DELTA 2000 // 20V, in 10mV increments
+#define DISCHARGE_GAP 10  // 15mV, in 10mV increments
 
 /* Magic Conversion Numbers */
 #define LT_VOLT_TO_FLOAT 0.0015
@@ -51,7 +52,7 @@
 #define THERM_B 3988
 #define CELCIUS_KELVIN_BIAS 273.15
 #define ROOM_TEMPERATURE 298.15
-#define V_INF 3.11  // Voltage at 0 Kelvin
+#define V_INF 3.075  // Voltage at 0 Kelvin
 #define R_INF 0.00000155921// exp(-THERM_B / ROOM_TEMPERATURE), precalculated for speed
 #define VOLTAGE_NUMERATOR 100000
 #define VOLTAGE_DENOMINATOR 2958
@@ -66,7 +67,7 @@
 #define SONG_TIME_LENGTH 25
 
 /* LT Boards */
-const char kLTNumOfCells[] = {10, 12, 11};
+const char kLTNumOfCells[] = {10, 11, 12};
 const byte kBoardAddress[] = {0x80, 0x81, 0x82};
 #define WRCFG 0x01   // Write config
 #define RDCFG 0x02   // Read config
@@ -83,8 +84,10 @@ const byte kBoardAddress[] = {0x80, 0x81, 0x82};
 #define DSCHG 0x60   // Start cell voltage A/D allowing discharge
 #define LT_UNDER_VOLTAGE 0x71  // 2.712V
 #define LT_OVER_VOLTAGE 0xAB  // 4.1V
-const byte kConfig[] = {0xE5,0x00,0x00,0x00,
-                         LT_UNDER_VOLTAGE,LT_OVER_VOLTAGE};
+#define CONFIG_ARG_NUM 6
+
+// This holds the configuration values for the LT boards, and controls discharging.
+byte lt_config[NUM_OF_LT_BOARDS][CONFIG_ARG_NUM];
 
 /* Data structures */
 
@@ -200,5 +203,7 @@ inline void SpiEnd(void) {
   digitalWrite(LT_CS, HIGH);
 }
 
+/** Set the config variable to discharge batteries **/
+void BalanceBatteries(const LTData *);
 
 #endif  // BMS_H
