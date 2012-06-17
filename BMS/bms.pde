@@ -5,7 +5,7 @@
  * Date: May 1 2012
  */
 
-#define ENABLE_BALANCING
+//#define ENABLE_BALANCING
 #define CRITICAL_MESSAGES
 // #define CAN_DEBUG
 // #define SPI_DEBUG
@@ -250,6 +250,20 @@ void SendHeartbeat(void){
 }
 
 void GetCarData(CarDataInt *car_data) {
+  byte config;
+  
+  SpiStart();
+  config = STCVAD;
+  SendToSpi(&config, 1);
+  delay(15); //Time for conversions, approx 12ms
+  SpiEnd();
+  
+  SpiStart();
+  config = STTMPAD;
+  SendToSpi(&config, 1);
+  delay(15); //Time for conversions, approx 12ms
+  SpiEnd();
+  
   for (byte i = 0; i < NUM_OF_LT_BOARDS; ++i) {
     GetLtBoardData(car_data->lt_board + i, i, averaging_data + i);
   }
@@ -622,6 +636,18 @@ void GetLtBoardData(LTData *new_data, byte board_num, LTMultipleData * avg_data)
   byte rconfig[6];
   GetFromSpi(rconfig, RDCFG, 6);
   SpiEnd();
+#ifdef VERBOSE
+  Serial.print("Sending config: ");
+  for(int i = 0 ;i< 6;++i){
+    Serial.print(lt_config[board_num][i], HEX);
+  }
+  Serial.println();
+  Serial.print("Got config: ");
+  for(int i = 0 ;i< 6;++i){
+    Serial.print(rconfig[i], HEX);
+  }
+  Serial.println();
+#endif
 
   if (rconfig[0] == 0xFF || rconfig[0] == 0x00 || rconfig[0] == 0x02) {
     //  If we get one of these responses, it means the LT board is not communicating.
@@ -641,12 +667,6 @@ void GetLtBoardData(LTData *new_data, byte board_num, LTMultipleData * avg_data)
     Serial.print(rconfig[1], HEX);
     Serial.println(rconfig[2], HEX);
   #endif
-  
-  SpiStart();
-  config = STCVAD;
-  SendToSpi(&config, 1);
-  delay(15); //Time for conversions, approx 12ms
-  SpiEnd();
 
   SpiStart();
   SendToSpi(kBoardAddress + board_num, 1);
@@ -671,8 +691,8 @@ void GetLtBoardData(LTData *new_data, byte board_num, LTMultipleData * avg_data)
 
   #ifdef VERBOSE
     Serial.print("LT Board ");
-    Serial.print(board_num);
-    Serial.print("voltages: ");
+    Serial.print(board_num, DEC);
+    Serial.print(" voltages: ");
     for (int i = 0; i < kLTNumOfCells[board_num]; ++i) {
       Serial.print(new_data->voltage[i]);
       Serial.print("(");
@@ -913,7 +933,6 @@ float ToTemperature(int temp) {
 
 void BalanceBatteries(const LTData *lt_board) {
   int lowest_voltage = LowestVoltage(lt_board);
-  int needs_bleeding[NUM_OF_LT_BOARDS][NUM_OF_VOLTAGES];
   for (int i = 0; i < NUM_OF_LT_BOARDS; ++i) {
     for (int j = 0; j < kLTNumOfCells[i]; ++j) {
       byte discharge = lt_board[i].voltage[j] > lowest_voltage + DISCHARGE_GAP;
