@@ -10,7 +10,7 @@
 #ifndef _DASHBOARD_PINDEF_H_
 #define _DASHBOARD_PINDEF_H_
 #include <WProgram.h>
-
+#define VERBOSE
 /* PINOUTS */
 // Light and Horn Switches
 #define IN_HAZ_SWITCH 10
@@ -24,13 +24,13 @@
 
 // Cruise control inputs and outputs
 #define IN_CRUISE_ON 16
-#define IN_CRUISE_DEC 26
-#define IN_CRUISE_ACC 25
+#define IN_CRUISE_DEC 25
+#define IN_CRUISE_ACC 26
 #define OUT_CRUISE_INDICATOR 15
 
 // Analog pedal in
-#define ANALOG_ACCEL_PEDAL 3
-#define ANALOG_BRAKE_PEDAL 4
+#define ANALOG_ACCEL_PEDAL 4
+#define ANALOG_BRAKE_PEDAL 3
 
 // Drive Switches
 #define IN_VEHICLE_FWD 21 
