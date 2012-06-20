@@ -7,8 +7,8 @@
 
 
 /* User constants */
-#define ACCEL_THRESHOLD_LOW    100
-#define ACCEL_THRESHOLD_HIGH   850
+#define ACCEL_THRESHOLD_LOW    1000
+#define ACCEL_THRESHOLD_HIGH   40
 #define BRAKE_THRESHOLD_LOW    10
 #define BRAKE_THRESHOLD_HIGH   330
 #define LIGHT_BLINK_PERIOD     512
@@ -24,7 +24,7 @@
 #define MAX_STATE_CHANGE_SPEED 2
 // This speed is the minimum speed needed to enable cruise control
 #define MIN_CRUISE_CONTROL_SPEED 2
-
+#define VERBOSE
 #define OFF   0
 #define ON    1
 #define FALSE 0
@@ -290,7 +290,7 @@ void sendDriveCommand(float motor_velocity, float motor_current) {
     Serial.print("CAN Packet To Tritium, Velocity ");
     Serial.print(motor_velocity);
     Serial.print(", Current");
-    Serial.print(motor_current);
+    Serial.println(motor_current);
   #endif
   CanMessage msg = CanMessage(CAN_TRITIUM_DRIVE, data.c);
   Can.send(msg);
@@ -381,15 +381,13 @@ void driverControl() {
   
   // The raw brake value decreases as you press it, so we reverse it here
   brake_input_raw = 1023 - brake_input_raw;
-  
   // Map values to 0.0 - 1.0 based on thresholds
-  int constrained_accel = constrain(accel_input_raw, ACCEL_THRESHOLD_LOW,
-                                    ACCEL_THRESHOLD_HIGH);
-  int constrained_brake = constrain(brake_input_raw, BRAKE_THRESHOLD_LOW,
-                                    BRAKE_THRESHOLD_HIGH);
+  int constrained_accel = constrain(accel_input_raw, min(ACCEL_THRESHOLD_LOW, ACCEL_THRESHOLD_HIGH),
+                                    max(ACCEL_THRESHOLD_LOW, ACCEL_THRESHOLD_HIGH));
+  int constrained_brake = constrain(brake_input_raw, min(BRAKE_THRESHOLD_LOW, BRAKE_THRESHOLD_HIGH),
+                                    max(BRAKE_THRESHOLD_LOW, BRAKE_THRESHOLD_HIGH));
   accel = map(constrained_accel, ACCEL_THRESHOLD_LOW, 
               ACCEL_THRESHOLD_HIGH, 0, 1000) / 1000.0;
-              // Fuck it, let's do it live!
   brake = map(constrained_brake, BRAKE_THRESHOLD_LOW, 
               BRAKE_THRESHOLD_HIGH, 0, 1000) / 1000.0;
               
@@ -398,7 +396,7 @@ void driverControl() {
   brake *= overcurrent_scale;
   #ifdef VERBOSE
     Serial.print("accel: ");
-    Serial.println(accel);
+    Serial.println(accel_input_raw);
     Serial.print("brake: ");
     Serial.println(brake_input_raw);
   #endif
