@@ -83,7 +83,7 @@ void loop() {
                  horn_state << 2 |
                  brake_state << 1 |
                  (state == REVERSE);
-    Can.send(CanMessage(CAN_DASHBOARD_INPUTS, &flags));
+    Can.send(CanMessage(CAN_DASHBOARD_INPUTS, &flags, 1));
   }
     
   #ifdef CAN_DEBUG
