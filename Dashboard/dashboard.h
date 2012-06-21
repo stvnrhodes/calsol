@@ -330,7 +330,8 @@ void updateDrivingState() {
     switch_state = REVERSE;
   }
   
-  regen_on = !digitalRead(IN_REGEN_SWITCH);
+//  regen_on = !digitalRead(IN_REGEN_SWITCH);
+regen_on = true; //temporary fix since we are driving without a regen switch.
   
   if (switch_state != state && current_speed < MAX_STATE_CHANGE_SPEED) {
     // Only switch states if the car is going at less than 10 mph.
