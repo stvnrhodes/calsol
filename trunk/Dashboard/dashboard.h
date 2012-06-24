@@ -5,11 +5,10 @@
  * Date: Oct 3rd 2011
  */
 
-
 /* User constants */
 #define ACCEL_THRESHOLD_LOW    1000
 #define ACCEL_THRESHOLD_HIGH   40
-#define BRAKE_THRESHOLD_LOW    60
+#define BRAKE_THRESHOLD_LOW    120
 #define BRAKE_THRESHOLD_HIGH   480
 #define LIGHT_BLINK_PERIOD     512
 #define CRUISE_SPEED_INCREMENT 0.1
@@ -24,11 +23,6 @@
 #define MAX_STATE_CHANGE_SPEED 2
 // This speed is the minimum speed needed to enable cruise control
 #define MIN_CRUISE_CONTROL_SPEED 2
-#define VERBOSE
-#define OFF   0
-#define ON    1
-#define FALSE 0
-#define TRUE  1
 
 /* State constants */
 enum states_enum {
@@ -52,9 +46,9 @@ volatile float current_speed = 0.0;  // Measured speed.
 // Last time we received a speed packet.
 volatile unsigned long last_updated_speed = 0;  
 float set_speed = 0.0;      // Desired speed based on cruise control in m/s.
-char cruise_on = OFF;         // Flag to set if cruise control is on or off.
-char regen_on = OFF;          // Flag to set if regen braking is enabled.
-char accel_cruise = OFF;  // Flag to allow using accelerator in cruise control
+char cruise_on = false;         // Flag to set if cruise control is on or off.
+char regen_on = false;          // Flag to set if regen braking is enabled.
+char accel_cruise = false;  // Flag to allow using accelerator in cruise control
 volatile char tritium_reset = 0;       // Number of times to reset the tritium.
 // This is used to scale down our max output if an OC error occurs
 float overcurrent_scale = 1.0;
@@ -63,13 +57,13 @@ volatile unsigned int tritium_error_flags = 0x00;  // Errors from tritium from C
 
 
 // Blinker states
-char hazard_state = OFF;
-char left_state   = OFF;
-char right_state  = OFF;
+char hazard_state = false;
+char left_state   = false;
+char right_state  = false;
 
 // Other 12V output states
-char brake_state  = OFF;
-char horn_state   = OFF;
+char brake_state  = false;
+char horn_state   = false;
 
 // Global timekeeping variables
 unsigned long last_sent_tritium = 0;
@@ -135,14 +129,14 @@ char isBlinkingLightsOn() {
   if (current_time - _last_lights_blinked > LIGHT_BLINK_PERIOD * 2 ||
       current_time < _last_lights_blinked) { // Edge case
     _last_lights_blinked = current_time;
-    return ON;
+    return true;
   }
   // Check if the light timer has been on for between half a second and a second
   if (current_time - _last_lights_blinked > LIGHT_BLINK_PERIOD) {
-    return OFF;
+    return false;
   }
   // The light is on if it's been less than half a second
-  return ON;
+  return true;
 }
   
 /***
@@ -172,34 +166,34 @@ void updateAuxiliaryStates() {
     // Hazard lights blink if Haz switch is on, or if the car is not okay.
     if (!hazard_state) {
       // If this state is off...
-      hazard_state = ON;
-      left_state   = OFF;
-      right_state  = OFF;
+      hazard_state = true;
+      left_state   = false;
+      right_state  = false;
       resetBlinkingLightsTimer();
     }
   } else if (!digitalRead(IN_LTURN_SWITCH)) {
     // Left turn lights
     if (!left_state) {
       // If this state is off...
-      hazard_state = OFF;
-      left_state   = ON;
-      right_state  = OFF;
+      hazard_state = false;
+      left_state   = true;
+      right_state  = false;
       resetBlinkingLightsTimer();
     }
   } else if (!digitalRead(IN_RTURN_SWITCH)) {
     // Right turn lights
     if (!right_state) {
       // If this state is off...
-      hazard_state = OFF;
-      left_state   = OFF;
-      right_state  = ON;
+      hazard_state = false;
+      left_state   = false;
+      right_state  = true;
       resetBlinkingLightsTimer();
     }
   } else {
     // Nothing is on, let's turn all the lights off.
-    hazard_state = OFF;
-    left_state   = OFF;
-    right_state  = OFF;
+    hazard_state = false;
+    left_state   = false;
+    right_state  = false;
   }
 }
 
@@ -209,26 +203,26 @@ void updateAuxiliaryStates() {
 void auxiliaryControl() {
   // Turn blinkers on and off.
   if (hazard_state && isBlinkingLightsOn()) {
-    digitalWrite(OUT_LTURN, ON);
-    digitalWrite(OUT_RTURN, ON);
-    digitalWrite(OUT_LTURN_INDICATOR, ON);
-    digitalWrite(OUT_RTURN_INDICATOR, ON);
+    digitalWrite(OUT_LTURN, true);
+    digitalWrite(OUT_RTURN, true);
+    digitalWrite(OUT_LTURN_INDICATOR, true);
+    digitalWrite(OUT_RTURN_INDICATOR, true);
   } else if (left_state && isBlinkingLightsOn()) {
-    digitalWrite(OUT_LTURN, ON);
-    digitalWrite(OUT_LTURN_INDICATOR, ON);
-    digitalWrite(OUT_RTURN, OFF);
-    digitalWrite(OUT_RTURN_INDICATOR, OFF);
+    digitalWrite(OUT_LTURN, true);
+    digitalWrite(OUT_LTURN_INDICATOR, true);
+    digitalWrite(OUT_RTURN, false);
+    digitalWrite(OUT_RTURN_INDICATOR, false);
   } else if (right_state && isBlinkingLightsOn()) {
-    digitalWrite(OUT_LTURN, OFF);
-    digitalWrite(OUT_LTURN_INDICATOR, OFF);
-    digitalWrite(OUT_RTURN, ON);
-    digitalWrite(OUT_RTURN_INDICATOR, ON);
+    digitalWrite(OUT_LTURN, false);
+    digitalWrite(OUT_LTURN_INDICATOR, false);
+    digitalWrite(OUT_RTURN, true);
+    digitalWrite(OUT_RTURN_INDICATOR, true);
   } else {
     // Turn all lights off.
-    digitalWrite(OUT_LTURN, OFF);
-    digitalWrite(OUT_RTURN, OFF);
-    digitalWrite(OUT_LTURN_INDICATOR, OFF);
-    digitalWrite(OUT_RTURN_INDICATOR, OFF);
+    digitalWrite(OUT_LTURN, false);
+    digitalWrite(OUT_RTURN, false);
+    digitalWrite(OUT_LTURN_INDICATOR, false);
+    digitalWrite(OUT_RTURN_INDICATOR, false);
   }
   
   // Turn on brake lights if the brake pedal is stepped on.
@@ -330,8 +324,7 @@ void updateDrivingState() {
     switch_state = REVERSE;
   }
   
-//  regen_on = !digitalRead(IN_REGEN_SWITCH);
-regen_on = true; //temporary fix since we are driving without a regen switch.
+  regen_on = !digitalRead(IN_REGEN_SWITCH);
   
   if (switch_state != state && current_speed < MAX_STATE_CHANGE_SPEED) {
     // Only switch states if the car is going at less than 10 mph.
@@ -343,30 +336,30 @@ regen_on = true; //temporary fix since we are driving without a regen switch.
  * Updates whether or not the car is in cruise control.
  */
 void updateCruiseState() {
-  static char is_cruise_on = FALSE;
+  static char is_cruise_on = false;
   if (current_speed > MIN_CRUISE_CONTROL_SPEED && state == FORWARD &&
       !cruise_on) {
     if (!digitalRead(IN_CRUISE_DEC) || !digitalRead(IN_CRUISE_ON)) {
       // Cruise is pressed, set cruise to whatever speed we are at.
       set_speed = current_speed;
-      cruise_on = ON;
-      accel_cruise = OFF;
-      digitalWrite(OUT_CRUISE_INDICATOR, ON);
+      cruise_on = true;
+      accel_cruise = false;
+      digitalWrite(OUT_CRUISE_INDICATOR, true);
     } else if (set_speed != 0.0 && !digitalRead(IN_CRUISE_ACC)) {
       // Resume old cruise speed 
-      cruise_on = ON;
-      accel_cruise = OFF;
-      digitalWrite(OUT_CRUISE_INDICATOR, ON);
+      cruise_on = true;
+      accel_cruise = false;
+      digitalWrite(OUT_CRUISE_INDICATOR, true);
     }
   } else if (cruise_on && digitalRead(IN_CRUISE_ON)) {
     // We are currently in cruise
-    is_cruise_on = TRUE;
+    is_cruise_on = true;
   } else if (is_cruise_on && !digitalRead(IN_CRUISE_ON)) {
     // Cruise is on, so we want to turns it off
-    cruise_on = OFF;
-    digitalWrite(OUT_CRUISE_INDICATOR, OFF);
+    cruise_on = false;
+    digitalWrite(OUT_CRUISE_INDICATOR, false);
   } else {
-    is_cruise_on = FALSE;
+    is_cruise_on = false;
   }
 }
 
@@ -410,8 +403,8 @@ void driverControl() {
     } else {
       sendDriveCommand(0.0, 0.0);
     }
-    cruise_on = OFF;
-    digitalWrite(OUT_CRUISE_INDICATOR, OFF);
+    cruise_on = false;
+    digitalWrite(OUT_CRUISE_INDICATOR, false);
   } else {
     switch (state) {
       case FORWARD:
@@ -419,7 +412,7 @@ void driverControl() {
           set_speed = adjustCruiseControl(set_speed);
           if (accel == 0.0) {
             // If pedal is not pressed, allow acceleration
-            accel_cruise = ON;
+            accel_cruise = true;
           }
           if (accel_cruise) {
             // Pressing the accelerator during cruise increases speed

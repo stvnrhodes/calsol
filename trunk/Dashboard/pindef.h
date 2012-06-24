@@ -15,8 +15,8 @@
 // Light and Horn Switches
 #define IN_HAZ_SWITCH 10
 #define IN_HORN_BUTTON 11
-#define IN_LTURN_SWITCH 25 //18
-#define IN_RTURN_SWITCH 26 //17
+#define IN_LTURN_SWITCH 18
+#define IN_RTURN_SWITCH 17
 
 // Light Indicators
 #define OUT_LTURN_INDICATOR 24
@@ -24,8 +24,8 @@
 
 // Cruise control inputs and outputs
 #define IN_CRUISE_ON 16
-#define IN_CRUISE_DEC 21 //25
-#define IN_CRUISE_ACC 19 //26
+#define IN_CRUISE_DEC 25
+#define IN_CRUISE_ACC 26
 #define OUT_CRUISE_INDICATOR 15
 
 // Analog pedal in
@@ -33,8 +33,8 @@
 #define ANALOG_BRAKE_PEDAL 3
 
 // Drive Switches
-#define IN_VEHICLE_FWD 17 //21
-#define IN_VEHICLE_REV 18 //19
+#define IN_VEHICLE_FWD 19
+#define IN_VEHICLE_REV 21
 #define IN_REGEN_SWITCH 20
 
 // 12V Switched Outputs
