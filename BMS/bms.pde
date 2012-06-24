@@ -765,7 +765,7 @@ void SendGeneralDataCanMessage(const CarDataFloat * data) {
 }  
 
 void SendErrorCanMessage(const CarState car_state, const Flags *flags) {
-  char flags_can_data[4];
+  char flags_can_data[4] = {0, 0, 0, 0};
   flags_can_data[0] |= flags->battery_overvoltage              << 0;
   flags_can_data[0] |= flags->battery_overvoltage_warning      << 1;
   flags_can_data[0] |= flags->battery_undervoltage             << 2;
