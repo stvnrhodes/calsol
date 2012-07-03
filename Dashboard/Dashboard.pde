@@ -10,8 +10,8 @@
 #include "dashboard.h"
 
 // Enable for more information over serial
- #define VERBOSE
- //#define CAN_DEBUG
+// #define VERBOSE
+// #define CAN_DEBUG
 #define ERRORS
 
 void setup() {
