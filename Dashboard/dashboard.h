@@ -12,7 +12,7 @@
 #define BRAKE_THRESHOLD_HIGH   500
 #define LIGHT_BLINK_PERIOD     512
 #define CRUISE_SPEED_INCREMENT 0.1
-#define CRUISE_TORQUE_SETTING  0.8
+#define CRUISE_TORQUE_SETTING  0.7
 
 // The length of time to flash for the error LEDs
 #define SHORT_FLASH_TIME  80
@@ -23,6 +23,8 @@
 #define MAX_STATE_CHANGE_SPEED 2
 // This speed is the minimum speed needed to enable cruise control
 #define MIN_CRUISE_CONTROL_SPEED 2
+// This is the fastest speed in m/s we can tell the Tritium to go
+#define MAX_TRITIUM_SPEED 100.0
 
 /* State constants */
 enum states_enum {
@@ -82,28 +84,29 @@ volatile unsigned long num_can = 0;
 typedef union {
   char  c[8];
   float f[2];
-  uint_32 int[2];
-} two_floats;
+  unsigned int i[2];
+} packed_data;
 
 /***
  * ISR for reading Tritium speed readings off CAN
  */
 void processCan(CanMessage &msg) {
   num_can++;
-  #ifdef CAN_DEBUG
-    Serial.print("CAN: ");
-    Serial.println(msg.id, HEX);
-  #endif
+#ifdef CAN_DEBUG
+  Serial.print("CAN: ");
+  Serial.println(msg.id, HEX);
+#endif
+  packed_data *data = (packed_data *) msg.data;
   if (msg.id == CAN_TRITIUM_VELOCITY) {
     last_updated_speed = millis();
-    current_speed = ((two_floats*)msg.data)->f[1];
+    current_speed = data->f[1];
     #ifdef VERBOSE
       Serial.println("Tritium Speed: ");
       Serial.println(current_speed);
     #endif
   } else if (msg.id == CAN_TRITIUM_STATUS) {
-    tritium_limit_flags = *((unsigned int*)&msg.data[0]);
-    tritium_error_flags = *((unsigned int*)&msg.data[2]);
+    tritium_limit_flags = data->i[0];
+    tritium_error_flags = data->i[2];
     if (msg.data[2] & 0x02) {
       #ifdef ERRORS
         Serial.println("Warning: Overcurrent Error");
@@ -290,7 +293,7 @@ void blinkStatusLED() {
  * in meters per second, and current is a float between 0.0 and 1.0.
  */
 void sendDriveCommand(float motor_velocity, float motor_current) {
-  two_floats data;
+  packed_data data;
   data.f[0] = motor_velocity;
   data.f[1] = motor_current;
   #ifdef VERBOSE
@@ -327,7 +330,7 @@ void resetTritium() {
  * switches.
  */
 // TODO: Cruise control
-void updateDrivingState() {
+states_enum getDrivingState(states_enum old_state) {
 
   // First, set switch_state to what the current switch is set at
   states_enum switch_state = NEUTRAL;
@@ -337,42 +340,40 @@ void updateDrivingState() {
     switch_state = REVERSE;
   }
   
+  // TODO(stvn): Refactor to remove global variable
   regen_on = !digitalRead(IN_REGEN_SWITCH);
-  
-  if (switch_state != state && current_speed < MAX_STATE_CHANGE_SPEED) {
+  return switch_state;
+
+// I've disabled the code below to see if anybody notices  
+//  if (switch_state != state && current_speed < MAX_STATE_CHANGE_SPEED) {
     // Only switch states if the car is going at less than 10 mph.
-    state = switch_state;
-  }
+//    return switch_state;
+//  }
+//  return old_state;
 }
 
 /***
  * Updates whether or not the car is in cruise control.
  */
-void updateCruiseState() {
-  static char is_cruise_on = false;
-  if (current_speed > MIN_CRUISE_CONTROL_SPEED && state == FORWARD &&
-      !cruise_on) {
-    if (!digitalRead(IN_CRUISE_DEC) || isCruisePressed()) {
-      // Cruise is pressed, set cruise to whatever speed we are at.
-      set_speed = current_speed;
-      cruise_on = true;
-      accel_cruise = false;
-      digitalWrite(OUT_CRUISE_INDICATOR, true);
-    } else if (set_speed != 0.0 && !digitalRead(IN_CRUISE_ACC)) {
-      // Resume old cruise speed 
-      cruise_on = true;
-      accel_cruise = false;
-      digitalWrite(OUT_CRUISE_INDICATOR, true);
+char getCruiseState(char in_cruise) {
+  static char last_button_state = false;
+  boolean cruise_pressed = isCruisePressed();
+  // If the button was just pressed
+  if (!last_button_state && cruise_pressed) {
+    // If we're not in cruise, try to turn it on
+    if (!in_cruise) {
+      // We'll turn on cruise if these conditions are met
+      if (current_speed > MIN_CRUISE_CONTROL_SPEED && state == FORWARD) {
+        accel_cruise = false;
+        digitalWrite(OUT_CRUISE_INDICATOR, true);
+        return true;
+      }
+      return false;
+    // Otherwise, we're already in cruise and want to turn it off
+    } else {
+      digitalWrite(OUT_CRUISE_INDICATOR, false);
+      return false;
     }
-  } else if (cruise_on && digitalRead(IN_CRUISE_ON)) {
-    // We are currently in cruise
-    is_cruise_on = true;
-  } else if (is_cruise_on && isCruisePressed()) {
-    // Cruise is on, so we want to turns it off
-    cruise_on = false;
-    digitalWrite(OUT_CRUISE_INDICATOR, false);
-  } else {
-    is_cruise_on = false;
   }
 }
 
@@ -405,57 +406,73 @@ void driverControl() {
   // In case we get overcurrent errors, reduce the power we send.
   accel *= overcurrent_scale;
   brake *= overcurrent_scale;
-  #ifdef VERBOSE
-    Serial.print("accel: ");
-    Serial.println(accel_input_raw);
-    Serial.print("brake: ");
-    Serial.println(brake_input_raw);
-  #endif
+#ifdef VERBOSE
+  Serial.print("accel: ");
+  Serial.println(accel_input_raw);
+  Serial.print("brake: ");
+  Serial.println(brake_input_raw);
+#endif
   
   // Send CAN data based on current state.
-  if (brake > 0.0) {
-    // If the brakes are tapped, cut off acceleration
-    if (regen_on) {
-      sendDriveCommand(0.0, brake);
-    } else {
-      sendDriveCommand(0.0, 0.0);
-    }
-    cruise_on = false;
-    digitalWrite(OUT_CRUISE_INDICATOR, false);
-  } else {
-    switch (state) {
-      case FORWARD:
-        if (cruise_on) {
-          set_speed = adjustCruiseControl(set_speed);
-          if (accel == 0.0) {
-            // If pedal is not pressed, allow acceleration
-            accel_cruise = true;
-          }
-          if (accel_cruise) {
-            // Pressing the accelerator during cruise increases speed
-            float cruise_accel = accel * (100.0 - set_speed) + set_speed;
-            float cruise_accel_torque = accel * (1.0 - CRUISE_TORQUE_SETTING) + 
-                CRUISE_TORQUE_SETTING;
-            sendDriveCommand(cruise_accel, cruise_accel_torque);
-          } else {
-            sendDriveCommand(set_speed, CRUISE_TORQUE_SETTING);
-          }
-        } else if (accel == 0.0) {
-          // Accelerator is not pressed
-          sendDriveCommand(0.0, 0.0);
+  state = getDrivingState(state);
+  cruise_on = getCruiseState(cruise_on);
+  switch (state) {
+    case FORWARD:
+      if (brake > 0.0) {
+        // If the brakes are tapped, cut off acceleration
+        if (regen_on) {
+          sendDriveCommand(0.0, brake);
         } else {
-          sendDriveCommand(100.0, accel);
+          sendDriveCommand(0.0, 0.0);
         }
-        break;
-      case REVERSE:
-        sendDriveCommand(-100.0, accel);
-        break;
-      case NEUTRAL:
+        cruise_on = false;
+        digitalWrite(OUT_CRUISE_INDICATOR, false);
+      } else if (cruise_on) {
+        set_speed = adjustCruiseControl(set_speed);
+        if (accel == 0.0) {
+          // If pedal is not pressed, allow acceleration
+          // Without this bit, pressing the cruise control would allow the car
+          // to momentarily accelerate
+          // TODO(stvn): Refactor to remove this global variable with something
+          // cleaner.
+          accel_cruise = true;
+        }
+        if (accel_cruise) {
+          // Pressing the accelerator during cruise increases speed
+          float cruise_accel = accel * (MAX_TRITIUM_SPEED - set_speed)
+              + set_speed;
+          float cruise_accel_torque = accel * (1.0 - CRUISE_TORQUE_SETTING) + 
+              CRUISE_TORQUE_SETTING;
+          sendDriveCommand(cruise_accel, cruise_accel_torque);
+        } else {
+          sendDriveCommand(set_speed, CRUISE_TORQUE_SETTING);
+        }
+      } else if (accel == 0.0) {
+        // Accelerator is not pressed
         sendDriveCommand(0.0, 0.0);
-        break;
-      default:
-        state = NEUTRAL;
-        break;
-    }
+      } else {
+        sendDriveCommand(MAX_TRITIUM_SPEED, accel);
+      }
+      break;
+    case REVERSE:
+      if (brake > 0.0) {
+        // If the brakes are tapped, cut off acceleration
+        if (regen_on) {
+          sendDriveCommand(0.0, brake);
+        } else {
+          sendDriveCommand(0.0, 0.0);
+        }
+        cruise_on = false;
+        digitalWrite(OUT_CRUISE_INDICATOR, false);
+      } else {
+        sendDriveCommand(-MAX_TRITIUM_SPEED, accel);
+      }
+      break;
+    case NEUTRAL:
+      sendDriveCommand(0.0, 0.0);
+      break;
+    default:
+      state = NEUTRAL;
+      break;
   }  
 }

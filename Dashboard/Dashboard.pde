@@ -20,7 +20,8 @@ void setup() {
   Can.begin(1000);
   CanBufferInit();
   initPins();
-  updateDrivingState();  // Set car state (for/rev/neu) based on inputs.
+  cruise_on = false;
+  state = NEUTRAL;
   status = OKAY_STATUS;
   tritium_reset = 1;
 }
@@ -52,8 +53,6 @@ void loop() {
   // Driver control.  Call state handler every 100 ms.
   if (millis() - last_sent_tritium > 100) {
     last_sent_tritium = millis();
-    updateDrivingState();
-    updateCruiseState();
    // if (status != ERROR_STATUS) {
       driverControl();
   //  }
