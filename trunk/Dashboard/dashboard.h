@@ -52,8 +52,8 @@ char accel_cruise = false;  // Flag to allow using accelerator in cruise control
 volatile char tritium_reset = 0;       // Number of times to reset the tritium.
 // This is used to scale down our max output if an OC error occurs
 float overcurrent_scale = 1.0;
-volatile unsigned int tritium_limit_flags = 0x00;  // Status of the tritium from CAN
-volatile unsigned int tritium_error_flags = 0x00;  // Errors from tritium from CAN
+volatile unsigned int tritium_limit_flags = 0x00;  // Tritium status from CAN
+volatile unsigned int tritium_error_flags = 0x00;  // Tritium errors from CAN
 
 
 // Blinker states
@@ -82,6 +82,7 @@ volatile unsigned long num_can = 0;
 typedef union {
   char  c[8];
   float f[2];
+  uint_32 int[2];
 } two_floats;
 
 /***
@@ -111,6 +112,18 @@ void processCan(CanMessage &msg) {
       tritium_reset = 2;
     }
   }
+}
+
+boolean isCruisePressed(void) {
+  static byte state = false;
+  static byte prev_reading = HIGH;
+  byte current_reading = digitalRead(IN_CRUISE_ON);
+  if (current_reading == prev_reading) {
+    // Only update the state if we have two identical readings in a row
+    current_reading == HIGH ? state = false : state = true;
+  }
+  prev_reading = current_reading;
+  return state;
 }
 
 /***
@@ -339,7 +352,7 @@ void updateCruiseState() {
   static char is_cruise_on = false;
   if (current_speed > MIN_CRUISE_CONTROL_SPEED && state == FORWARD &&
       !cruise_on) {
-    if (!digitalRead(IN_CRUISE_DEC) || !digitalRead(IN_CRUISE_ON)) {
+    if (!digitalRead(IN_CRUISE_DEC) || isCruisePressed()) {
       // Cruise is pressed, set cruise to whatever speed we are at.
       set_speed = current_speed;
       cruise_on = true;
@@ -354,7 +367,7 @@ void updateCruiseState() {
   } else if (cruise_on && digitalRead(IN_CRUISE_ON)) {
     // We are currently in cruise
     is_cruise_on = true;
-  } else if (is_cruise_on && !digitalRead(IN_CRUISE_ON)) {
+  } else if (is_cruise_on && isCruisePressed()) {
     // Cruise is on, so we want to turns it off
     cruise_on = false;
     digitalWrite(OUT_CRUISE_INDICATOR, false);
@@ -376,10 +389,14 @@ void driverControl() {
   // The raw brake value decreases as you press it, so we reverse it here
   brake_input_raw = 1023 - brake_input_raw;
   // Map values to 0.0 - 1.0 based on thresholds
-  int constrained_accel = constrain(accel_input_raw, min(ACCEL_THRESHOLD_LOW, ACCEL_THRESHOLD_HIGH),
-                                    max(ACCEL_THRESHOLD_LOW, ACCEL_THRESHOLD_HIGH));
-  int constrained_brake = constrain(brake_input_raw, min(BRAKE_THRESHOLD_LOW, BRAKE_THRESHOLD_HIGH),
-                                    max(BRAKE_THRESHOLD_LOW, BRAKE_THRESHOLD_HIGH));
+  int constrained_accel =
+      constrain(accel_input_raw,
+          min(ACCEL_THRESHOLD_LOW, ACCEL_THRESHOLD_HIGH),
+          max(ACCEL_THRESHOLD_LOW, ACCEL_THRESHOLD_HIGH));
+  int constrained_brake = 
+      constrain(brake_input_raw, 
+          min(BRAKE_THRESHOLD_LOW, BRAKE_THRESHOLD_HIGH),
+          max(BRAKE_THRESHOLD_LOW, BRAKE_THRESHOLD_HIGH));
   accel = map(constrained_accel, ACCEL_THRESHOLD_LOW, 
               ACCEL_THRESHOLD_HIGH, 0, 1000) / 1000.0;
   brake = map(constrained_brake, BRAKE_THRESHOLD_LOW, 
@@ -417,7 +434,8 @@ void driverControl() {
           if (accel_cruise) {
             // Pressing the accelerator during cruise increases speed
             float cruise_accel = accel * (100.0 - set_speed) + set_speed;
-            float cruise_accel_torque = accel * (1.0 - CRUISE_TORQUE_SETTING) + CRUISE_TORQUE_SETTING;
+            float cruise_accel_torque = accel * (1.0 - CRUISE_TORQUE_SETTING) + 
+                CRUISE_TORQUE_SETTING;
             sendDriveCommand(cruise_accel, cruise_accel_torque);
           } else {
             sendDriveCommand(set_speed, CRUISE_TORQUE_SETTING);
