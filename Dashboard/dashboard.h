@@ -5,11 +5,13 @@
  * Date: Oct 3rd 2011
  */
 
+// #define CRUISE_DEBUG
+
 /* User constants */
 #define ACCEL_THRESHOLD_LOW    1000
 #define ACCEL_THRESHOLD_HIGH   40
-#define BRAKE_THRESHOLD_LOW    50
-#define BRAKE_THRESHOLD_HIGH   500
+#define BRAKE_THRESHOLD_LOW    970
+#define BRAKE_THRESHOLD_HIGH   520
 #define LIGHT_BLINK_PERIOD     512
 #define CRUISE_SPEED_INCREMENT 0.1
 #define CRUISE_TORQUE_SETTING  0.7
@@ -31,33 +33,37 @@ enum states_enum {
   FORWARD,
   REVERSE,
   NEUTRAL,
+  CRUISE,
   ERROR
-} state;
+};
 
 // Health status
 enum status_enum {
   OKAY_STATUS,
   ERROR_STATUS,
   CAN_ERROR_STATUS
-} status;
+} status = OKAY_STATUS;
 
 /* Global variables */
-float accel = 0.0;
-float brake = 0.0;
 volatile float current_speed = 0.0;  // Measured speed.
 // Last time we received a speed packet.
 volatile unsigned long last_updated_speed = 0;  
 float set_speed = 0.0;      // Desired speed based on cruise control in m/s.
-char cruise_on = false;         // Flag to set if cruise control is on or off.
 char regen_on = false;          // Flag to set if regen braking is enabled.
-char accel_cruise = false;  // Flag to allow using accelerator in cruise control
 volatile char tritium_reset = 0;       // Number of times to reset the tritium.
 // This is used to scale down our max output if an OC error occurs
 float overcurrent_scale = 1.0;
 volatile unsigned int tritium_limit_flags = 0x00;  // Tritium status from CAN
 volatile unsigned int tritium_error_flags = 0x00;  // Tritium errors from CAN
 
-
+// Possible TODO
+/*typedef struct {
+  byte hazard_state: 1;
+  byte left_state: 1;
+  byte right_state: 1;
+  byte brake_state: 1;
+  byte horn_state: 1;
+} blinker_states;*/
 // Blinker states
 char hazard_state = false;
 char left_state   = false;
@@ -75,9 +81,6 @@ unsigned long last_status_blink = 0;
 // Time since the last Overcurrent Error, in millis()
 volatile unsigned long time_of_last_oc = 0;
 
-// Global debug
-volatile unsigned long num_can = 0;
-
 /* Helper functions */
 // 8 chars and 2 floats sharing the same space. Used for converting two floats
 // into a format that we can use to send CAN data.
@@ -91,19 +94,18 @@ typedef union {
  * ISR for reading Tritium speed readings off CAN
  */
 void processCan(CanMessage &msg) {
-  num_can++;
 #ifdef CAN_DEBUG
   Serial.print("CAN: ");
   Serial.println(msg.id, HEX);
 #endif
-  packed_data *data = (packed_data *) msg.data;
+  const packed_data *data = (packed_data *) msg.data;
   if (msg.id == CAN_TRITIUM_VELOCITY) {
     last_updated_speed = millis();
     current_speed = data->f[1];
-    #ifdef VERBOSE
-      Serial.println("Tritium Speed: ");
-      Serial.println(current_speed);
-    #endif
+#ifdef VERBOSE
+    Serial.println("Tritium Speed: ");
+    Serial.println(current_speed);
+#endif
   } else if (msg.id == CAN_TRITIUM_STATUS) {
     tritium_limit_flags = data->i[0];
     tritium_error_flags = data->i[2];
@@ -118,9 +120,9 @@ void processCan(CanMessage &msg) {
 }
 
 boolean isCruisePressed(void) {
-  static byte state = false;
-  static byte prev_reading = HIGH;
-  byte current_reading = digitalRead(IN_CRUISE_ON);
+  static boolean state = false;
+  static boolean prev_reading = HIGH;
+  boolean current_reading = digitalRead(IN_CRUISE_ON);
   if (current_reading == prev_reading) {
     // Only update the state if we have two identical readings in a row
     current_reading == HIGH ? state = false : state = true;
@@ -241,9 +243,6 @@ void auxiliaryControl() {
     digitalWrite(OUT_RTURN_INDICATOR, false);
   }
   
-  // Turn on brake lights if the brake pedal is stepped on.
-  brake_state = brake > 0.0;
-  digitalWrite(OUT_BRAKELIGHT, brake_state);
   
   // Turn on horn if the horn button is pressed.
   horn_state = !digitalRead(IN_HORN_BUTTON);
@@ -325,19 +324,71 @@ void resetTritium() {
   time_of_last_oc = millis();
 }
 
+
+/***
+ * Updates whether or not the car is in cruise control.
+ */
+boolean getCruiseState(states_enum old_state, float brake) {
+  static boolean last_button_state = false;
+  boolean cruise_pressed = isCruisePressed();
+#ifdef CRUISE_DEBUG
+  Serial.print("old_state: ");
+  Serial.print(old_state, DEC);
+  Serial.print(", last_button_state: ");
+  Serial.print(last_button_state, DEC);
+  Serial.print(", cruise_pressed: ");
+  Serial.println(cruise_pressed, DEC);
+#endif
+  if (old_state == CRUISE && brake > 0.02) {
+#ifdef CRUISE_DEBUG
+    Serial.println("Braking, so disabling cruise control")
+#endif
+    digitalWrite(OUT_CRUISE_INDICATOR, false);
+    return false;
+  }
+ // If the button was just pressed
+  if (!last_button_state && cruise_pressed) {
+    last_button_state = cruise_pressed;
+    // If we're not in cruise, try to turn it on
+    if (old_state != CRUISE) {
+      // We'll turn on cruise if these conditions are met
+      if (current_speed > MIN_CRUISE_CONTROL_SPEED && old_state == FORWARD) {
+        digitalWrite(OUT_CRUISE_INDICATOR, true);
+        return true;
+      }
+      return false;
+    // Otherwise, we're already in cruise and want to turn it off
+    } else {
+      digitalWrite(OUT_CRUISE_INDICATOR, false);
+      return false;
+    }
+  } else {
+    // No change
+    last_button_state = cruise_pressed;
+    return (old_state == CRUISE);
+  }
+}
+
+
 /***
  * Updates the current state of the car (Forward, Reverse, Neutral) based on
  * switches.
  */
-// TODO: Cruise control
-states_enum getDrivingState(states_enum old_state) {
+states_enum getDrivingState(states_enum old_state, float brake) {
 
-  // First, set switch_state to what the current switch is set at
-  states_enum switch_state = NEUTRAL;
-  if (!digitalRead(IN_VEHICLE_FWD)) {
+  states_enum switch_state;
+ 
+  // First check for cruise
+  boolean cruise_on = getCruiseState(old_state, brake);
+  if (cruise_on) {
+    switch_state = CRUISE;
+  // Then, set switch_state to what the current switch is set at
+  } else if (!digitalRead(IN_VEHICLE_FWD)) {
     switch_state = FORWARD;
   } else if (!digitalRead(IN_VEHICLE_REV)) {
     switch_state = REVERSE;
+  } else {
+    switch_state = NEUTRAL;
   }
   
   // TODO(stvn): Refactor to remove global variable
@@ -352,72 +403,10 @@ states_enum getDrivingState(states_enum old_state) {
 //  return old_state;
 }
 
-/***
- * Updates whether or not the car is in cruise control.
- */
-char getCruiseState(char in_cruise) {
-  static char last_button_state = false;
-  boolean cruise_pressed = isCruisePressed();
-  // If the button was just pressed
-  if (!last_button_state && cruise_pressed) {
-    // If we're not in cruise, try to turn it on
-    if (!in_cruise) {
-      // We'll turn on cruise if these conditions are met
-      if (current_speed > MIN_CRUISE_CONTROL_SPEED && state == FORWARD) {
-        accel_cruise = false;
-        digitalWrite(OUT_CRUISE_INDICATOR, true);
-        return true;
-      }
-      return false;
-    // Otherwise, we're already in cruise and want to turn it off
-    } else {
-      digitalWrite(OUT_CRUISE_INDICATOR, false);
-      return false;
-    }
-  }
-}
-
-
-/***
- * Calls a single routine of the driver routine loop.  This function reads
- * pedal inputs, adjusts for thresholds, and send CAN data to the Tritium.
- */
-void driverControl() {
-  // Read raw pedal values
-  int accel_input_raw = analogRead(ANALOG_ACCEL_PEDAL);
-  int brake_input_raw = analogRead(ANALOG_BRAKE_PEDAL);
-  
-  // The raw brake value decreases as you press it, so we reverse it here
-  brake_input_raw = 1023 - brake_input_raw;
-  // Map values to 0.0 - 1.0 based on thresholds
-  int constrained_accel =
-      constrain(accel_input_raw,
-          min(ACCEL_THRESHOLD_LOW, ACCEL_THRESHOLD_HIGH),
-          max(ACCEL_THRESHOLD_LOW, ACCEL_THRESHOLD_HIGH));
-  int constrained_brake = 
-      constrain(brake_input_raw, 
-          min(BRAKE_THRESHOLD_LOW, BRAKE_THRESHOLD_HIGH),
-          max(BRAKE_THRESHOLD_LOW, BRAKE_THRESHOLD_HIGH));
-  accel = map(constrained_accel, ACCEL_THRESHOLD_LOW, 
-              ACCEL_THRESHOLD_HIGH, 0, 1000) / 1000.0;
-  brake = map(constrained_brake, BRAKE_THRESHOLD_LOW, 
-              BRAKE_THRESHOLD_HIGH, 0, 1000) / 1000.0;
-              
-  // In case we get overcurrent errors, reduce the power we send.
-  accel *= overcurrent_scale;
-  brake *= overcurrent_scale;
-#ifdef VERBOSE
-  Serial.print("accel: ");
-  Serial.println(accel_input_raw);
-  Serial.print("brake: ");
-  Serial.println(brake_input_raw);
-#endif
-  
-  // Send CAN data based on current state.
-  state = getDrivingState(state);
-  cruise_on = getCruiseState(cruise_on);
+void createDriveCommands(const states_enum state, const float accel,
+    const float brake) {
   switch (state) {
-    case FORWARD:
+    case CRUISE:
       if (brake > 0.0) {
         // If the brakes are tapped, cut off acceleration
         if (regen_on) {
@@ -425,27 +414,22 @@ void driverControl() {
         } else {
           sendDriveCommand(0.0, 0.0);
         }
-        cruise_on = false;
-        digitalWrite(OUT_CRUISE_INDICATOR, false);
-      } else if (cruise_on) {
+      } else {
         set_speed = adjustCruiseControl(set_speed);
-        if (accel == 0.0) {
-          // If pedal is not pressed, allow acceleration
-          // Without this bit, pressing the cruise control would allow the car
-          // to momentarily accelerate
-          // TODO(stvn): Refactor to remove this global variable with something
-          // cleaner.
-          accel_cruise = true;
-        }
-        if (accel_cruise) {
-          // Pressing the accelerator during cruise increases speed
-          float cruise_accel = accel * (MAX_TRITIUM_SPEED - set_speed)
-              + set_speed;
-          float cruise_accel_torque = accel * (1.0 - CRUISE_TORQUE_SETTING) + 
-              CRUISE_TORQUE_SETTING;
-          sendDriveCommand(cruise_accel, cruise_accel_torque);
+#ifdef CRUISE_DEBUG
+        Serial.print("Go ");
+        Serial.println(set_speed);
+#endif
+        sendDriveCommand(set_speed, CRUISE_TORQUE_SETTING);
+      }
+      break;
+    case FORWARD:
+      if (brake > 0.0) {
+        // If the brakes are tapped, cut off acceleration
+        if (regen_on) {
+          sendDriveCommand(0.0, brake);
         } else {
-          sendDriveCommand(set_speed, CRUISE_TORQUE_SETTING);
+          sendDriveCommand(0.0, 0.0);
         }
       } else if (accel == 0.0) {
         // Accelerator is not pressed
@@ -462,8 +446,6 @@ void driverControl() {
         } else {
           sendDriveCommand(0.0, 0.0);
         }
-        cruise_on = false;
-        digitalWrite(OUT_CRUISE_INDICATOR, false);
       } else {
         sendDriveCommand(-MAX_TRITIUM_SPEED, accel);
       }
@@ -472,7 +454,54 @@ void driverControl() {
       sendDriveCommand(0.0, 0.0);
       break;
     default:
-      state = NEUTRAL;
       break;
   }  
 }
+
+float getPedal(const byte port, const int lower, const int upper) {
+  // Read raw pedal values
+  int input_raw = analogRead(port);
+#ifdef VERBOSE
+  Serial.print("pedal reading: ");
+  Serial.print(input_raw);
+  Serial.print(" on ");
+  Serial.println(port);
+#endif
+
+  // Map values to 0.0 - 1.0 based on thresholds
+  int constrained = constrain(input_raw,
+      min(lower, upper),
+      max(lower, upper));
+
+  float pedal = map(constrained, lower, upper, 0, 1000) / 1000.0;
+
+              
+  // In case we get overcurrent errors, reduce the power we send.
+  pedal *= overcurrent_scale;
+  return pedal;
+}
+
+/***
+ * Calls a single routine of the driver routine loop.  This function reads
+ * pedal inputs, adjusts for thresholds, and send CAN data to the Tritium.
+ */
+states_enum driverControl() {
+
+  float accel = getPedal(ANALOG_ACCEL_PEDAL, ACCEL_THRESHOLD_LOW,
+      ACCEL_THRESHOLD_HIGH);
+  float brake = getPedal(ANALOG_BRAKE_PEDAL, BRAKE_THRESHOLD_LOW,
+      BRAKE_THRESHOLD_HIGH);
+
+  // Turn on brake lights if the brake pedal is stepped on.
+  // TODO(stvn): Figure out a better place to put this
+  brake_state = brake > 0.0;
+  digitalWrite(OUT_BRAKELIGHT, brake_state);
+
+  
+  // Send CAN data based on current state.
+  static states_enum state = NEUTRAL;
+  state = getDrivingState(state, brake);
+  createDriveCommands(state, accel, brake);
+  return state;
+}
+
