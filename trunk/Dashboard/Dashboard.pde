@@ -77,12 +77,19 @@ void loop() {
       Serial.print(", Driving mode is ");
       Serial.println(state);
     #endif
-    char flags = right_state << 4 |
-                 left_state << 3 |
-                 horn_state << 2 |
-                 brake_state << 1 |
-                 (state == REVERSE);
-    Can.send(CanMessage(CAN_DASHBOARD_INPUTS, &flags, 1));
+    packed_data flags;
+    flags.c[0] = 
+        (tritium_reset > 0) << 6 |
+        regen_on << 5 |
+        right_state << 4 |
+        left_state << 3 |
+        horn_state << 2 |
+        brake_state << 1 |
+        hazard_state;
+    flags.c[1] = state;
+    flags.c[2] = status;
+    flags.f[1] = set_speed;
+    Can.send(CanMessage(CAN_DASHBOARD_INPUTS, flags.c, 8));
   }
     
   #ifdef CAN_DEBUG
