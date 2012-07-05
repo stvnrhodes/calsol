@@ -49,7 +49,7 @@ volatile float current_speed = 0.0;  // Measured speed.
 // Last time we received a speed packet.
 volatile unsigned long last_updated_speed = 0;  
 float set_speed = 0.0;      // Desired speed based on cruise control in m/s.
-char regen_on = false;          // Flag to set if regen braking is enabled.
+boolean regen_on = false;          // Flag to set if regen braking is enabled.
 volatile char tritium_reset = 0;       // Number of times to reset the tritium.
 // This is used to scale down our max output if an OC error occurs
 float overcurrent_scale = 1.0;
@@ -291,7 +291,7 @@ void blinkStatusLED() {
  * Sends a drive command packet to the Tritium motor controller.  Velocity is
  * in meters per second, and current is a float between 0.0 and 1.0.
  */
-void sendDriveCommand(float motor_velocity, float motor_current) {
+void sendDriveCommand(const float motor_velocity, const float motor_current) {
   packed_data data;
   data.f[0] = motor_velocity;
   data.f[1] = motor_current;
@@ -328,7 +328,7 @@ void resetTritium() {
 /***
  * Updates whether or not the car is in cruise control.
  */
-boolean getCruiseState(states_enum old_state, float brake) {
+boolean getCruiseState(const states_enum old_state, const float brake) {
   static boolean last_button_state = false;
   boolean cruise_pressed = isCruisePressed();
 #ifdef CRUISE_DEBUG
@@ -374,7 +374,7 @@ boolean getCruiseState(states_enum old_state, float brake) {
  * Updates the current state of the car (Forward, Reverse, Neutral) based on
  * switches.
  */
-states_enum getDrivingState(states_enum old_state, float brake) {
+states_enum getDrivingState(const states_enum old_state, const float brake) {
 
   states_enum switch_state;
  
