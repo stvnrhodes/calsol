@@ -14,15 +14,14 @@
 // #define CAN_DEBUG
 #define ERRORS
 
+states_enum state;
+
 void setup() {
   Serial.begin(115200);
   Can.attach(&processCan);
   Can.begin(1000);
   CanBufferInit();
   initPins();
-  cruise_on = false;
-  state = NEUTRAL;
-  status = OKAY_STATUS;
   tritium_reset = 1;
 }
 
@@ -36,9 +35,10 @@ void loop() {
   
   // The following code blinks the error LED.  Not available 
   // during cruise control.
-  if(!cruise_on) {
-    blinkStatusLED();
-  }
+  // If you want this to work, you'll need to fix cruise_on
+//  if(!cruise_on) {
+//    blinkStatusLED();
+//  }
   
   // Reset overcurrent scale after 10 seconds if its below 1.0
   if (overcurrent_scale != 1.0 && millis() - time_of_last_oc > 10000)
@@ -54,7 +54,7 @@ void loop() {
   if (millis() - last_sent_tritium > 100) {
     last_sent_tritium = millis();
    // if (status != ERROR_STATUS) {
-      driverControl();
+      state = driverControl();
   //  }
   }
   
@@ -90,6 +90,7 @@ void loop() {
     Serial.print(Can.rxError());
     Serial.print(" TX: ");
     Serial.println(Can.txError());
+    delay(50);
   #endif
   
 }
