@@ -353,6 +353,7 @@ boolean getCruiseState(const states_enum old_state, const float brake) {
     if (old_state != CRUISE) {
       // We'll turn on cruise if these conditions are met
       if (current_speed > MIN_CRUISE_CONTROL_SPEED && old_state == FORWARD) {
+        set_speed = current_speed;
         digitalWrite(OUT_CRUISE_INDICATOR, true);
         return true;
       }
@@ -416,11 +417,13 @@ void createDriveCommands(const states_enum state, const float accel,
         }
       } else {
         set_speed = adjustCruiseControl(set_speed);
-#ifdef CRUISE_DEBUG
-        Serial.print("Go ");
-        Serial.println(set_speed);
-#endif
-        sendDriveCommand(set_speed, CRUISE_TORQUE_SETTING);
+
+        // We scale the cruise to go faster when the trigger is pressed.
+        float cruise_accel = accel * (MAX_TRITIUM_SPEED - set_speed) + set_speed;
+        float cruise_accel_torque = accel * (1.0 - CRUISE_TORQUE_SETTING) +   
+           CRUISE_TORQUE_SETTING;    
+        sendDriveCommand(cruise_accel, cruise_accel_torque);
+//        sendDriveCommand(set_speed, CRUISE_TORQUE_SETTING);
       }
       break;
     case FORWARD:
