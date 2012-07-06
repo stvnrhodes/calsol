@@ -72,6 +72,7 @@ void loop() {
       case ENABLE_CHARGING:
         flags.charging_disabled_too_hot = flags.too_hot_to_charge;
         flags.charging_disabled_too_full = flags.too_full_to_charge;
+        EnableCharging();
         break;
       case IN_PRECHARGE:
       case CAR_ON:
