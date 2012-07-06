@@ -22,13 +22,14 @@ CarDataInt car_data;
 Flags flags;
 CarState car_state = CAR_OFF;
 
-// If left on for 50 days, time will overflow and we will have undefined behavior.
+// If left on for 50 days, time will overflow and we will have undefined
+// behavior.
 long data_time;
 long heartbeat_time;
 long battery_time;
 long song_time;
 
-// Hackish, but I need to maintain a counter for this somewhere.  Used in loop().
+// Hackish, but I need to maintain a counter for this somewhere.  Used in loop()
 byte lt_counter = 0;
 
 // Only used to average out readings from LT boards
@@ -276,17 +277,22 @@ void GetCarData(CarDataInt *car_data) {
 
 void GetFlags(Flags *flags, const CarDataInt *car_data) {
   flags->battery_overvoltage = car_data->battery_voltage > OVERVOLTAGE_CUTOFF;
-  flags->battery_overvoltage_warning = car_data->battery_voltage > OVERVOLTAGE_WARNING;
+  flags->battery_overvoltage_warning =
+      car_data->battery_voltage > OVERVOLTAGE_WARNING;
   flags->battery_undervoltage = car_data->battery_voltage < UNDERVOLTAGE_CUTOFF;
-  flags->battery_undervoltage_warning = car_data->battery_voltage < UNDERVOLTAGE_WARNING;
+  flags->battery_undervoltage_warning =
+      car_data->battery_voltage < UNDERVOLTAGE_WARNING;
 
   // TODO:(stvn): Test assumption that negative current == charging
-  flags->discharging_overcurrent = car_data->battery_current > DISCHARGING_OVERCURRENT_CUTOFF;
-  flags->charging_overcurrent = car_data->battery_current < CHARGING_OVERCURRENT_CUTOFF;
+  flags->discharging_overcurrent =
+      car_data->battery_current > DISCHARGING_OVERCURRENT_CUTOFF;
+  flags->charging_overcurrent =
+      car_data->battery_current < CHARGING_OVERCURRENT_CUTOFF;
   flags->batteries_charging = car_data->battery_current < CHARGING_THRESHOLD;
   
   flags->motor_precharged = (car_data->motor_voltage > MOTOR_MINIMUM_VOLTAGE) &&
-      (car_data->battery_voltage - car_data->motor_voltage < MOTOR_MAXIMUM_DELTA);
+      (car_data->battery_voltage - car_data->motor_voltage <
+          MOTOR_MAXIMUM_DELTA);
       
   flags->missing_lt_communication = false;
   for (int i = 0; i < NUM_OF_LT_BOARDS; ++i) {
@@ -297,26 +303,36 @@ void GetFlags(Flags *flags, const CarDataInt *car_data) {
 
   if (!flags->missing_lt_communication) {
     int high_voltage = HighestVoltage(car_data->lt_board);
-    flags->module_overvoltage = high_voltage > MODULE_OVERVOLTAGE_CUTOFF;
-    flags->module_overvoltage_warning = high_voltage > MODULE_OVERVOLTAGE_WARNING;
+    flags->module_overvoltage =
+        high_voltage > MODULE_OVERVOLTAGE_CUTOFF;
+    flags->module_overvoltage_warning =
+        high_voltage > MODULE_OVERVOLTAGE_WARNING;
     int low_voltage = LowestVoltage(car_data->lt_board);
     flags->module_undervoltage = low_voltage < MODULE_UNDERVOLTAGE_CUTOFF;
-    flags->module_undervoltage_warning = low_voltage < MODULE_UNDERVOLTAGE_WARNING;
+    flags->module_undervoltage_warning =
+        low_voltage < MODULE_UNDERVOLTAGE_WARNING;
     float high_temperature = HighestTemperature(car_data->lt_board);
     flags->battery_overtemperature = high_temperature > OVERTEMP_CUTOFF;
-    flags->battery_overtemperature_warning = high_temperature > OVERTEMP_WARNING;
-    flags->charging_overtemperature = high_temperature > CHARGING_OVERTEMP_CUTOFF;
-    flags->charging_temperature_warning = high_temperature > CHARGING_OVERTEMP_WARNING;
+    flags->battery_overtemperature_warning =
+        high_temperature > OVERTEMP_WARNING;
+    flags->charging_overtemperature =
+        high_temperature > CHARGING_OVERTEMP_CUTOFF;
+    flags->charging_temperature_warning =
+        high_temperature > CHARGING_OVERTEMP_WARNING;
 
-    if (flags->charging_disabled_too_hot && high_temperature < TEMPERATURE_OK_TO_CHARGE) {
+    if (flags->charging_disabled_too_hot &&
+        high_temperature < TEMPERATURE_OK_TO_CHARGE) {
       flags->too_hot_to_charge = false;
-    } else if (!flags->charging_disabled_too_hot && high_temperature > OVERTEMPERATURE_NO_CHARGE) {
+    } else if (!flags->charging_disabled_too_hot &&
+        high_temperature > OVERTEMPERATURE_NO_CHARGE) {
       flags->too_hot_to_charge = true;
     }
 
-    if (flags->charging_disabled_too_full && high_voltage < VOLTAGE_OK_TO_CHARGE) {
+    if (flags->charging_disabled_too_full &&
+        high_voltage < VOLTAGE_OK_TO_CHARGE) {
       flags->too_full_to_charge = false;
-    } else if (!flags->charging_disabled_too_full && high_voltage > OVERVOLTAGE_NO_CHARGE) {
+    } else if (!flags->charging_disabled_too_full &&
+        high_voltage > OVERVOLTAGE_NO_CHARGE) {
       flags->too_full_to_charge = true;
     }
   }
@@ -392,7 +408,8 @@ CarState GetCarState(const CarState old_state, const Flags *flags) {
         return DISABLE_CHARGING;
       }
       if ((!flags->too_hot_to_charge && !flags->too_full_to_charge) &&
-          (flags->charging_disabled_too_hot || flags->charging_disabled_too_full)) {
+          (flags->charging_disabled_too_hot ||
+              flags->charging_disabled_too_full)) {
         #ifdef CRITICAL_MESSAGES
           PrintErrorMessage(S_ENABLE_CHARGING);
         #endif
@@ -443,7 +460,8 @@ int IsCriticalError(const Flags *flags) {
   }
   // TODO(stvn): Calibrate current, then replace this with commented out line.
   if (flags->module_overvoltage) {
-  // stvn: We possibly want to do this if we want to be able to turn on the car and it's too high
+  // stvn: We possibly want to do this if we want to be able to turn on the car
+  //   and it's too high
   // if (flags->module_overvoltage && flags->batteries_charging) {
     #ifdef CRITICAL_MESSAGES
       PrintErrorMessage(BPS_OVERVOLT);
@@ -620,7 +638,8 @@ void AddReading(LTMultipleData * mult, const LTData * reading) {
   mult->ptr = (mult->ptr + 1) % NUM_OF_AVERAGES;
 }
 
-void GetLtBoardData(LTData *new_data, byte board_num, LTMultipleData * avg_data) {
+void GetLtBoardData(LTData *new_data, byte board_num,
+    LTMultipleData * avg_data) {
   byte config;
 
   SpiStart();
@@ -651,7 +670,8 @@ void GetLtBoardData(LTData *new_data, byte board_num, LTMultipleData * avg_data)
 #endif
 
   if (rconfig[0] == 0xFF || rconfig[0] == 0x00 || rconfig[0] == 0x02) {
-    //  If we get one of these responses, it means the LT board is not communicating.
+    //  If we get one of these responses, it means the LT board is not
+    // communicating.
     new_data->is_valid = false;
     #ifdef CRITICAL_MESSAGES
       Serial.print("LT Board ");
@@ -711,7 +731,7 @@ void GetLtBoardData(LTData *new_data, byte board_num, LTMultipleData * avg_data)
     Serial.print("), ");
     Serial.print(new_data->temperature[2]);
     Serial.print("(");
-    Serial.print(CONVERT_THIRD_TO_CELCIUS(new_data->temperature[0]));
+    Serial.print(CONVERT_3RD_TO_CELCIUS(new_data->temperature[0]));
     Serial.println(")");
   #endif
 }
@@ -740,7 +760,7 @@ void SendLtBoardCanMessage(const LTData * data, byte board_num) {
   Can.send(CanMessage(board_address, msg.c, 4));
   msg.f[0] = ToTemperature(data->temperature[1]);
   Can.send(CanMessage(board_address + 1, msg.c, 4));
-  msg.f[0] = CONVERT_THIRD_TO_CELCIUS(data->temperature[2]);
+  msg.f[0] = CONVERT_3RD_TO_CELCIUS(data->temperature[2]);
   Can.send(CanMessage(board_address + 2, msg.c, 4));
 }
 
@@ -865,9 +885,12 @@ const byte temperatures[]) {
   data->voltage[9] = (voltages[13] & 0xF0) >> 4 | (voltages[14] & 0xFF) << 4;
   data->voltage[10] = (voltages[15] & 0xFF) | (voltages[16] & 0x0F) << 8;
   data->voltage[11] = (voltages[16] & 0xF0) >> 4 | (voltages[17] & 0xFF) << 4;
-  data->temperature[0] = (temperatures[0] & 0xFF) | (temperatures[1] & 0x0F) << 8;
-  data->temperature[1] = (temperatures[1] & 0xF0) >> 4 | (temperatures[2] & 0xFF) << 4;
-  data->temperature[2] = (temperatures[3] & 0xFF) | (temperatures[4] & 0x0F) << 8;
+  data->temperature[0] = (temperatures[0] & 0xFF) | 
+      (temperatures[1] & 0x0F) << 8;
+  data->temperature[1] = (temperatures[1] & 0xF0) >> 4 |
+      (temperatures[2] & 0xFF) << 4;
+  data->temperature[2] = (temperatures[3] & 0xFF) |
+      (temperatures[4] & 0x0F) << 8;
 }
 
 void PrintErrorMessage(enum error_codes code) {
@@ -917,7 +940,7 @@ float HighestTemperature(const LTData *board) {
     }
     // The internal die temperature seems unreliable for now, so let's 
     // ignore it when determining if we have too high a temperature.
-    //    current = CONVERT_THIRD_TO_CELCIUS(board[i].temperature[2]);
+    //    current = CONVERT_3RD_TO_CELCIUS(board[i].temperature[2]);
     //    if (max < current) {
     //      max = current;
     //    }
@@ -949,7 +972,8 @@ void BalanceBatteries(const LTData *lt_board) {
         lt_config[i][1] = (lt_config[i][1] & !(1 << j)) | (discharge << j);
       } 
       else {
-        lt_config[i][2] = (lt_config[i][2] & !(1 << (j - 8))) | (discharge << (j - 8));
+        lt_config[i][2] = (lt_config[i][2] & !(1 << (j - 8))) |
+            (discharge << (j - 8));
       }
     }
     #ifdef VERBOSE
