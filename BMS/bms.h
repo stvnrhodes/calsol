@@ -53,12 +53,13 @@
 #define CELCIUS_KELVIN_BIAS 273.15
 #define ROOM_TEMPERATURE 298.15
 #define V_INF 3.075  // Voltage at 0 Kelvin
-#define R_INF 0.00000155921// exp(-THERM_B / ROOM_TEMPERATURE), precalculated for speed
+#define R_INF 0.00000155921// exp(-THERM_B / ROOM_TEMPERATURE), precalculated
 #define VOLTAGE_NUMERATOR 100000
 #define VOLTAGE_DENOMINATOR 2958
-#define CONVERT_THIRD_TO_CELCIUS(x) (x * LT_THIRD_TEMP_TO_FLOAT - CELCIUS_KELVIN_BIAS)
+#define CONVERT_3RD_TO_CELCIUS(x) (x*LT_THIRD_TEMP_TO_FLOAT-CELCIUS_KELVIN_BIAS)
 #define CONVERT_TO_MILLIAMPS(x) (x * 40)
-#define CONVERT_TO_MILLIVOLTS(x) ((x * VOLTAGE_NUMERATOR) / (VOLTAGE_DENOMINATOR)) // 10mV/unit
+  // 10mV/unit
+#define CONVERT_TO_MILLIVOLTS(x) ((x * VOLTAGE_NUMERATOR)/(VOLTAGE_DENOMINATOR))
 
 /* Times (in ms) for how often to do actions */
 #define DATA_TIME_LENGTH 200
@@ -86,7 +87,7 @@ const byte kBoardAddress[] = {0x80, 0x81, 0x82};
 #define LT_OVER_VOLTAGE 0xAB  // 4.1V
 #define CONFIG_ARG_NUM 6
 
-// This holds the configuration values for the LT boards, and controls discharging.
+// This holds the configuration values for the LT boards and controls discharge.
 byte lt_config[NUM_OF_LT_BOARDS][CONFIG_ARG_NUM];
 
 /* Data structures */
