@@ -75,10 +75,13 @@ void loop() {
         flags.charging_disabled_too_full = flags.too_full_to_charge;
         EnableCharging();
         break;
+      case EMERGENCY_SHUTOFF:
+        ShutdownCar(&flags);
+        buzzer.PlaySong(kEmergencyShutdownBeep);
+        break;        
       case IN_PRECHARGE:
       case CAR_ON:
       case CAR_OFF:
-      case EMERGENCY_SHUTOFF:
       default:
         break;
     }
@@ -565,7 +568,7 @@ signed int GetBatteryCurrent(void) {
   static byte ptr = 0;
 
   signed long reading = analogRead(C_BATTERY) - analogRead(C_GND);
-  old_readings[ptr] = CONVERT_TO_MILLIVOLTS(reading);
+  old_readings[ptr] = CONVERT_TO_MILLIAMPS(reading);
   ptr = (ptr + 1) % 3;
   #ifdef VERBOSE
     Serial.print("Battery Current: ");
