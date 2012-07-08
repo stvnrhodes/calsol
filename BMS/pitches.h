@@ -139,6 +139,13 @@ const uint16_t kShutdownBeep[][2] = {
   {SILENCE, 0}
 };
 
+const uint16_t kEmergencyShutdownBeep[][2] = {
+  {NOTE_E4, 1000},
+  {SILENCE, 50},
+
+  {SILENCE, 0} 
+};
+
 const uint16_t kLowVoltageBeep[][2] = {
   {NOTE_A3, 100},
   {NOTE_C4, 100},
