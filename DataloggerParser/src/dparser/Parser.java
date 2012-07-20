@@ -262,7 +262,12 @@ public class Parser {
 	public void parse(String data) {
 		ArrayList<String> split = new ArrayList<String>();
 		String [] op = data.split("\\s");
-		int opCode = code.valueOf(op[0]).num;
+		int opCode = -1;
+		try {
+			opCode = code.valueOf(op[0]).num;
+		} catch (IllegalArgumentException e) {
+			// Do absolutely nothing!
+		}
 		if (op[0].equalsIgnoreCase("T_RTC"))
 			dataValid = true;
 		if (dataValid) {
@@ -332,10 +337,13 @@ public class Parser {
 					temp = new VoltageMessage(sp, true);
 					addToMatrix(temp);
 					break;
+				/*
+				Don't want dismount messages as of now
 				case 9:
 					temp = new DismountMessage(sp, true);
 					addToMatrix(temp);
 					break;
+				*/
 				case 10:
 					errors.add(new CTMessage(sp, true));
 					break;
