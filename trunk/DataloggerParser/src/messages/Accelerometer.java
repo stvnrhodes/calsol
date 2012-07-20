@@ -1,4 +1,4 @@
-package dparser;
+package messages;
 
 import java.util.ArrayList;
 
@@ -27,7 +27,7 @@ public class Accelerometer extends Message {
 		ArrayList<String> packed = new ArrayList<String>();
 		String out = "";
 		for (int i = 0; i < data.size(); i++) {
-			out += timestamp.toString() + ";";
+			out += stamp.toString() + ";";
 			out += header.get(0) + ";" + (char)('X' + i) + ";";
 		    out += data.get(i);
 			packed.add(out);

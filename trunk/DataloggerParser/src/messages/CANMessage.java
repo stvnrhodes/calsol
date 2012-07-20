@@ -1,6 +1,9 @@
-package dparser;
+package messages;
 
 import java.util.ArrayList;
+
+import exceptions.DecodeException;
+import exceptions.PackException;
 /**
  * This is a message from CAN. This class implements the
  * format from JSON configuration files to decode what type of CAN
@@ -206,7 +209,7 @@ public class CANMessage extends Message {
 		if (data.size() < 1 || header.size() < 2)
 			throw new PackException();
 		for (int i = 0; i < header.size() - 1; i++) {
-			out += timestamp.toString() + ";";
+			out += stamp.toString() + ";";
 			out += header.get(0) + ";";
 			out += header.get(i + 1) + ";";
 			if (header.get(0).substring

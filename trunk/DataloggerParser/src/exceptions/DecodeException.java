@@ -1,4 +1,4 @@
-package dparser;
+package exceptions;
 
 /**
  * Thrown when the CAN Message decoder runs into too few bytes
