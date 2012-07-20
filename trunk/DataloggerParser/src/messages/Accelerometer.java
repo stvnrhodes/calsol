@@ -12,6 +12,17 @@ import java.util.ArrayList;
  */
 public class Accelerometer extends Message {
 
+	/**
+	 * Sets up a new Accelerometer Message. The constructor first determines
+	 * whether there is a stamp associated with the Message, and then
+	 * acts accordingly.
+	 * @param info The split String coming from the datalogger
+	 * line. Element 0 should be an opCode. Element 1 should either
+	 * be a stamp, or the payload that should be processed 
+	 * accordingly. Element 2, if it exists, will be part of the payload.
+	 * @param ts <b>True</b> means that there is a stamp. 
+	 * <b>False</b> means that there is no stamp.
+	 */
 	public Accelerometer(String [] info, boolean ts) {
 		super(info,ts);
 		header.add("Accelerometer");
