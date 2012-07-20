@@ -1,11 +1,13 @@
-package dparser;
+package messages;
 
 import java.util.ArrayList;
+
+import exceptions.PackException;
 
 /**
  * Abstract message class. This is the basis for all messages
  * coming from the datalogger. All messages have an opcode,
- * possibly a timestamp, and maybe a payload. This class
+ * possibly a stamp, and maybe a payload. This class
  * handles that ambiguity. It is extended by the various types
  * of message classes to handle the different opCodes.
  * @author Derek Chou
@@ -14,7 +16,7 @@ import java.util.ArrayList;
 public abstract class Message {
 	
 	/**
-	 * Does the Message have a timestamp? If it does,
+	 * Does the Message have a stamp? If it does,
 	 * this is set to true. Otherwise, this defaults to 
 	 * false.
 	 */
@@ -33,35 +35,14 @@ public abstract class Message {
 	public boolean hasData = false;
 	
 	/**
-	 * This Double is set to whatever the timestamp of the
+	 * This is set to whatever the stamp of the
 	 * Message is, if there is one. It does NOT contain
-	 * the timestamp error. <br>
-	 * Defaults to null if there is no timestamp.
+	 * the stamp error. <br>
+	 * Defaults to null if there is no stamp.
 	 */
-	protected Double timestamp = null;
+	protected Timestamp stamp = new Timestamp();
 	
-	/**
-	 * While <b>timestamp</b> is a 
-	 * decimal number, timestampFrac is an Integer meant to 
-	 * represent the numerator over 1024. Defaults to null if
-	 * there is no timestamp error.
-	 */
-	protected Integer timestampFrac = null;
 	
-	/**
-	 * This Double is set to whatever the timestamp error
-	 * of the Message is, if there is one.<br>
-	 * Defaults to null if there is no timestamp.
-	 */
-	protected Double tsError = null;
-	
-	/**
-	 * While <b>tsError</b> is a decimal number,
-	 * tsErrorFrac is an Integer meant to represent the
-	 * numerator over 1024. Defaults to null if there is
-	 * no timestamp error.
-	 */
-	protected Integer tsErrorFrac = null;
 	
 	/**
 	 * All Messages *should* have a header, but this may not be
@@ -93,14 +74,14 @@ public abstract class Message {
 	
 	/**
 	 * Sets up a new Message. The constructor first determines whether
-	 * there is a timestamp associated with the Message, and then
+	 * there is a stamp associated with the Message, and then
 	 * acts accordingly.
 	 * @param info The split String coming from the datalogger
 	 * line. Element 0 should be an opCode. Element 1 should either
-	 * be a timestamp, or the payload that should be processed 
+	 * be a stamp, or the payload that should be processed 
 	 * accordingly. Element 2, if it exists, will be part of the payload.
-	 * @param ts <b>True</b> means that there is a timestamp. 
-	 * <b>False</b> means that there is no timestamp.
+	 * @param ts <b>True</b> means that there is a stamp. 
+	 * <b>False</b> means that there is no stamp.
 	 */
 	public Message(String [] info, boolean ts) {
 		timestamped = ts;
@@ -125,49 +106,37 @@ public abstract class Message {
 	}
 	
 	/**
-	 * @return The timestamp of the message, if it exists.
+	 * @return The stamp of the message, if it exists.
 	 * Otherwise, it returns <b>null</b>
 	 */
 	public Double getTimestamp() {
 		if (timestamped)
-		    return timestamp;
+		    return stamp.getValue();
 		else
 			return null;
 	}
 	
 	/**
-	 * Sets the timestamp for a timestamped Message.
-	 * @param s The purported String that contains timestamp information.
+	 * Sets the stamp for a timestamped Message.
+	 * @param s The purported String that contains stamp information.
 	 */
 	public void setTimestamp(String s) {
 		if (timestamped)
-			if (s.indexOf('/') != -1) {
-			    timestampFrac = Integer.parseInt
-			    		(s.substring(0,s.indexOf('/')), 16);
-			    tsErrorFrac = Integer.parseInt
-			    		(s.substring(s.indexOf('/')+1),16);
-			    timestamp = time * timestampFrac;
-			    tsError = time * tsErrorFrac;
-		    }
-			else {
-				timestampFrac = Integer.parseInt(s, 16);
-				timestamp = time * timestampFrac;
-			}
+			stamp.setTime(s);
 		else
 			return;
 	}
 	
 	/**
 	 * @return An array of Strings that includes the Message's 
-	 * timestamp (if it exists), the error on the timestamp (if it exists),
+	 * stamp (if it exists), the error on the stamp (if it exists),
 	 * the header, and the data carried by the Message (if it exists).
 	 */
 	public String [] params() {
 		String ts = "";
 		if (timestamped) {
 			try {
-				ts = timestamp.toString() + " ± " 
-						+ tsError.toString();
+				ts = stamp.toString();
 				String h = header.toString();
 				try {
 					String d =  data.toString();
@@ -178,7 +147,7 @@ public abstract class Message {
 					return out;
 				}
 			} catch (NullPointerException e) {
-				ts = timestamp.toString();
+				ts = stamp.toString();
 				String h = header.toString();
 				try {
 					String d =  data.toString();
@@ -205,11 +174,11 @@ public abstract class Message {
 	
 	/**
 	 * Intended only for use with timestamped Messages going to Motor team.
-	 * @return The major parameters of a Message timestamp,
+	 * @return The major parameters of a Message stamp,
 	 * header, and data in that order. 
 	 * This is for the Matlab reader - the format will be as
 	 * follows: <br>
-	 * timestamp;name;description;data
+	 * stamp;name;description;data
 	 */
 	public ArrayList<String> pack() throws PackException {
 		ArrayList<String> packed = new ArrayList<String>();
@@ -217,7 +186,7 @@ public abstract class Message {
 		if (data.size() < 1 || header.size() < 2)
 			throw new PackException();
 		for (int i = 0; i < header.size() - 1; i++) {
-			out += timestamp.toString() + ";";
+			out += stamp.toString() + ";";
 			out += header.get(0) + ";";
 			out += header.get(i + 1) + ";";
 			out += data.get(i);
@@ -228,7 +197,7 @@ public abstract class Message {
 	}
 	
 	/**
-	 * Prints out the Message and its timestamp and its error. If the timestamp
+	 * Prints out the Message and its stamp and its error. If the stamp
 	 * and/or error do not exist, they will not be printed.
 	 */
 	@Override
@@ -236,10 +205,9 @@ public abstract class Message {
 		String out = "";
 		if (timestamped) {
 			try {
-				out += timestamp.toString() + " ± " 
-						+ tsError.toString() + "\r\n";
+				out += stamp.toString() + "\r\n";
 			} catch (NullPointerException e) {
-				out += timestamp.toString() + "\r\n";
+				out += stamp.toString() + "\r\n";
 			} finally {
 				out += header.toString() + "\r\n" + data.toString() + "\r\n";
 			}

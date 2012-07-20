@@ -6,9 +6,23 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Scanner;
 
+import messages.Accelerometer;
+import messages.BOverflow;
+import messages.CANMessage;
+import messages.CANOverflow;
+import messages.CTMessage;
+import messages.DismountMessage;
+import messages.Message;
+import messages.SDMessage;
+import messages.SDMount;
+import messages.VoltageMessage;
+import messages.vPerf;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import exceptions.PackException;
 
 /**
  * Parser written for the CalSol datalogger
@@ -369,14 +383,14 @@ public class Parser {
 	 * @param temp The message to be added to the large matrix of data
 	 */
 	private void addToMatrix(Message temp) {
-		int i = findIndex(temp.header);
+		int i = findIndex(temp.getHeader());
 		if (i != -1) {
-			matrix.get(findIndex(temp.header)).add(temp);
+			matrix.get(findIndex(temp.getHeader())).add(temp);
 		} 
 		else {
 			matrix.add(new ArrayList<Message>());
 			matrix.get(matrix.size()-1).add(temp);
-			matrixIndex.add(temp.header);
+			matrixIndex.add(temp.getHeader());
 		}
 		data.add(temp);
 	}
@@ -482,16 +496,16 @@ public class Parser {
 			Message tempMsg = data.get(i);
 			if (!tempMsg.hasData)
 				continue;
-			if (tempMsg.header.equals(m1) 
-					|| tempMsg.header.equals(m2) 
-					|| tempMsg.header.equals(m3)) {
+			if (tempMsg.getHeader().equals(m1) 
+					|| tempMsg.getHeader().equals(m2) 
+					|| tempMsg.getHeader().equals(m3)) {
 				ArrayList<String> temp;
 				try {
 					temp = tempMsg.pack();
 				} catch (PackException e) {
 					continue;
 				}
-				if (tempMsg.header.equals(m3)) {
+				if (tempMsg.getHeader().equals(m3)) {
 					out.add(temp.get(0));
 				} else {
 				    for (int j = 0; j < temp.size(); j++) {
