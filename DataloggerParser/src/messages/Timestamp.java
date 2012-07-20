@@ -52,8 +52,8 @@ public class Timestamp {
 			seconds = Integer.parseInt(
 					s.substring(0, s.indexOf('.')));
 			fractions = Integer.parseInt(
-					s.substring(s.indexOf('.') + 1),
-					s.indexOf('/'));
+					s.substring(s.indexOf('.') + 1, 
+					s.indexOf('/')));
 			error = Integer.parseInt(
 					s.substring(s.indexOf('/') + 1));
 			time = (seconds + (double)fractions / TIMEBASE);

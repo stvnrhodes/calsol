@@ -35,11 +35,20 @@ import exceptions.PackException;
  */
 public class Parser {
 	
+	private final int CAN_ID_LOC = 3;
+	
 	/**
 	 * Tells whether we want to output the ArrayLists' toString()s stored 
 	 * inside each message. Defaults to false.
 	 */
 	private boolean debug = false;
+	
+	/**
+	 * Tells whether we are in valid data territory. If the lines being 
+	 * parsed are still initialization messages, then ignore everything
+	 * until the initialization is done.
+	 */
+	private boolean dataValid = false;
 	
 	/**
 	 * An ArrayList of all JSON Objects created from initializing the Parser.
@@ -128,7 +137,7 @@ public class Parser {
 	 * 
 	 * <tr><td>Buffer Overflow</td><td><b>BOVF</b></td><td>1</td></tr>
 	 * 
-	 * <tr><td>CAN Message</td><td><b>CM</b></td><td>2</td></tr>
+	 * <tr><td>CAN Message</td><td><b>CRM</b></td><td>2</td></tr>
 	 * 
 	 * <tr><td>CAN Overflow</td><td><b>COVF</b></td><td>3</td></tr>
 	 * 
@@ -143,29 +152,35 @@ public class Parser {
 	 * <tr><td>SD Card Mounted</td><td><b>MNT</b></td><td>6</td></tr> 
 	 * 
 	 * <tr><td>Statistical Performance Measurement</td>
-	 * <td><b>PS</b></td><td>7</td></tr>
+	 * <td><b>PFM</b></td><td>7</td></tr>
 	 * 
 	 * <tr><td>Statistical Voltage Measurement</td>
-	 * <td><b>VS</b></td><td>8</td></tr>
+	 * <td><b>VLT</b></td><td>8</td></tr>
 	 * 
 	 * <tr><td>SD Card Dismount</td><td><b>DM</b></td><td>9</td></tr>
 	 * 
-	 * <tr><td>CAN Transmit Error</td><td><b>CT</b></td><td>10</td></tr>
+	 * <tr><td>CAN Transmit Error</td><td><b>CTE</b></td><td>10</td></tr>
+	 * 
+	 * <tr><td>Real Time Clock</td><td><b>T_RTC</b></td><td>11</td></tr>
+	 * 
+	 * <tr><td>CAN Receive Error</td><td><b>CRE</b></td><td>12</td></tr>
 	 */
 	private enum code {
 		ACL  (0),
 		BOVF (1),
-		CM   (2),
+		CRM  (2),
 		COVF (3),
 		MOVF (3),
 		CRD  (4),
 		PRM  (5),
 		PWM  (5),
 		MNT  (6),
-		PS   (7),
-		VS   (8),
+		PFM  (7),
+		VLT  (8),
 		DM   (9),
-		CT   (10);
+		CTE  (10),
+		T_RTC(11),
+		CRE  (12);
 		private int num;
 		code (int num) {
 			this.setNum(num);
@@ -245,87 +260,96 @@ public class Parser {
 	 * @param data A line of datalogger output.
 	 */
 	public void parse(String data) {
-		String [] sp = data.split(" ");
-		int opCode = code.valueOf(sp[0]).num;
-		Message temp = null;
-		switch (opCode) {
-		case 0:
-			temp = new Accelerometer(sp, true);
-			addToMatrix(temp);
-			break;
-		case 1:
-			errors.add(new BOverflow(sp, true));
-			break;
-		case 2:
-			boolean isError = false;
-			if (sp[2].equalsIgnoreCase("covf") 
-					|| sp[2].equalsIgnoreCase("movf")) {
-				isError = true;
-				temp = new CANMessage(sp, true, isError, null);
-				errors.add(temp);
-				break;
-			} else {
-				ArrayList<String> h = decodeJSON(sp);
-				try {
-					String format = h.remove(h.size()-1);
-					temp = new CANMessage(sp, true, isError, format);
-					temp.setHeader(h);
-				} catch (IndexOutOfBoundsException e) {
-					temp = new CANMessage(sp, true, isError, null);
-					ArrayList<String> tempList = new ArrayList<String>();
-					tempList.add("Unknown CAN Message");
-					temp.setHeader(tempList);
-				}
+		ArrayList<String> split = new ArrayList<String>();
+		String [] op = data.split("\\s");
+		int opCode = code.valueOf(op[0]).num;
+		if (op[0].equalsIgnoreCase("T_RTC"))
+			dataValid = true;
+		if (dataValid) {
+			for (String s : op) 
+				if (!s.isEmpty())
+					split.add(s);
+			String [] sp = split.toArray(new String[split.size()]);
+			Message temp = null;
+			switch (opCode) {
+			    case 0:
+				    temp = new Accelerometer(sp, true);
+			    	addToMatrix(temp);
+		    		break;
+				case 1:
+					errors.add(new BOverflow(sp, true));
+					break;
+				case 2:
+					boolean isError = false;
+					if (sp[2].equalsIgnoreCase("covf") 
+							|| sp[2].equalsIgnoreCase("movf")) {
+						isError = true;
+						temp = new CANMessage(sp, true, isError, null);
+						errors.add(temp);
+						break;
+					} else {
+						ArrayList<String> h = decodeJSON(sp);
+						try {
+							String format = h.remove(h.size()-1);
+							temp = new CANMessage(sp, true, isError, format);
+							temp.setHeader(h);
+						} catch (IndexOutOfBoundsException e) {
+							temp = new CANMessage(sp, true, isError, null);
+							ArrayList<String> tempList = 
+									new ArrayList<String>();
+							tempList.add("Unknown CAN Message");
+							temp.setHeader(tempList);
+						}
+					}
+					addToMatrix(temp);
+					break;
+				case 3:
+					errors.add(new CANOverflow(sp, false));
+					break;
+				case 4:
+					cfg.add(new SDMessage(sp, true));
+					break;
+				/* 
+				This will be implemented in a later version of the parser
+				case 5:
+					try {
+						params(sp);
+					} catch (IndexOutOfBoundsException e) {
+						// Do nothing!
+						e.printStackTrace();
+					}
+					break;
+				*/
+				case 6:
+					temp = new SDMount(sp, true);
+					addToMatrix(temp);
+					break;
+				case 7:
+					temp = new vPerf(sp, true);
+					addToMatrix(temp);
+					break;
+				case 8:
+					temp = new VoltageMessage(sp, true);
+					addToMatrix(temp);
+					break;
+				case 9:
+					temp = new DismountMessage(sp, true);
+					addToMatrix(temp);
+					break;
+				case 10:
+					errors.add(new CTMessage(sp, true));
+					break;
+				default:
+					break;
 			}
-			addToMatrix(temp);
-			break;
-		case 3:
-			errors.add(new CANOverflow(sp, false));
-			break;
-		case 4:
-			cfg.add(new SDMessage(sp, true));
-			break;
-		/* 
-		This will be implemented in a later version of the parser
-		case 5:
 			try {
-				params(sp);
-			} catch (IndexOutOfBoundsException e) {
-				// Do nothing!
-				e.printStackTrace();
+				if (debug && temp != null) {
+					System.out.println(temp);
+					db.println(temp);
+			    }	
+			} catch(NullPointerException e) {
+				/* Do absolutely nothing! */			
 			}
-			break;
-		*/
-		case 6:
-			temp = new SDMount(sp, true);
-			addToMatrix(temp);
-			break;
-		case 7:
-			temp = new vPerf(sp, true);
-			addToMatrix(temp);
-			break;
-		case 8:
-			temp = new VoltageMessage(sp, true);
-			addToMatrix(temp);
-			break;
-		case 9:
-			temp = new DismountMessage(sp, true);
-			addToMatrix(temp);
-			break;
-		case 10:
-			errors.add(new CTMessage(sp, true));
-			break;
-		default:
-			break;
-			
-		}
-		try {
-			if (debug && temp != null) {
-				System.out.println(temp);
-				db.println(temp);
-		    }	
-		} catch(NullPointerException e) {
-			/* Do absolutely nothing! */			
 		}
 	}
 	
@@ -340,11 +364,11 @@ public class Parser {
 		JSONObject A = null;
 		ArrayList<String> h = new ArrayList<String>();
 		for (int i = 0; i < decoder.size(); i++) {
-			if(decoder.get(i).has("0x" + sp[5]))
+			if(decoder.get(i).has("0x" + sp[CAN_ID_LOC]))
 				try {
-					A = decoder.get(i).getJSONObject("0x" + sp[5]);
+					A = decoder.get(i).getJSONObject("0x" + sp[CAN_ID_LOC]);
 					try {
-						h.add("0x" + sp[5] + " " + A.getString("name"));
+						h.add("0x" + sp[3] + " " + A.getString("name"));
 					} catch (JSONException e) {
 						/* Do nothing! */
 					}
