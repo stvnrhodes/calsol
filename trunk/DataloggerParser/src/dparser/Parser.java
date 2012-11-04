@@ -55,37 +55,6 @@ public class Parser {
     private static ArrayList<JSONObject> decoder = new ArrayList<JSONObject>();
 
     /**
-     * An ArrayList of all timestamped non-error data, be it accelerometer
-     * data, CAN messages, etc.
-     */
-    private static ArrayList<Message> data = new ArrayList<Message>();
-
-    /**
-     * An ArrayList of SD card information and other configuration things.
-     */
-    private static ArrayList<Message> cfg = new ArrayList<Message>();
-
-    /**
-     * An ArrayList of all error messages logged by the datalogger in the
-     * .dla file. This includes BOVF and COVF messages.
-     */
-    private static ArrayList<Message> errors = new ArrayList<Message>();
-
-    /**
-     * Contains the headers for the <b>matrix</b> ArrayList of ArrayLists so
-     * that it is easy to locate the correct ArrayList in the matrix.
-     */
-    private static ArrayList<ArrayList<String>> matrixIndex =
-            new ArrayList<ArrayList<String>>();
-
-    /**
-     * This contains sorted data; basically a message-type determined matrix of
-     * timestamped non-error data.
-     */
-    private static ArrayList<ArrayList<Message>> matrix =
-            new ArrayList<ArrayList<Message>>();
-
-    /**
      * The first header that Motor Team is interested in.
      */
     private ArrayList<String> m1 = new ArrayList<String>();
