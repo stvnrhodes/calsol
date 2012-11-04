@@ -1,9 +1,12 @@
 package dparser;
 
+import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Scanner;
@@ -60,12 +63,7 @@ public class DParser {
             if (returnVal == JFileChooser.APPROVE_OPTION) {
                 File file = fd.getSelectedFile();
                 try {
-                    Scanner f = new Scanner(file);
-                    while (f.hasNext()) {
-                        ArrayList<String> line = p.parse(f.nextLine());
-                        write(line);
-                    }
-                    f.close();
+                    write(file);
                 } catch (FileNotFoundException e) {
                     /*Do nothing!*/
                     e.printStackTrace();
@@ -96,27 +94,33 @@ public class DParser {
      * @param file The original file that was opened for parsing - needed
      * to get the name of the file.
      */
-    private static void write(ArrayList<String> input) throws IOException {
+    private static void write(File file) throws IOException {
         String fileName = file.getName().substring
                 (0,file.getName().indexOf('.'))+ "rawdata.csv";
         try {
-
-            FileWriter f = new FileWriter(new File(fileName));
-            CSVWriter wr = new CSVWriter(f);
+            Scanner f = new Scanner(file);
+            int i = 0;
+            while (f.hasNext()) {
+                ArrayList<String> line = p.parse(f.nextLine());
+                if (i == Integer.MAX_VALUE)
+                    System.gc();
+            }
+            f.close();
+            FileWriter fr = new FileWriter(new File(fileName));
+            BufferedWriter output = new BufferedWriter(fr);
+            CSVWriter wr = new CSVWriter(fr);
             String [] data = {"Timestamp", "Message", "Data"};
             wr.writeNext(data);
-            wr.writeAll(p.getStrings());
-            f.close();
+            fr.close();
             wr.close();
 
             fileName = file.getName().substring(0,file.getName().indexOf('.'))
                     + "errors.csv";
-            f = new FileWriter(new File(fileName));
-            wr = new CSVWriter(f);
+            fr = new FileWriter(new File(fileName));
+            wr = new CSVWriter(fr);
             String [] errors = {"Timestamp", "Error Type", "Data"};
             wr.writeNext(errors);
-            wr.writeAll(p.getErrorStrings());
-            f.close();
+            fr.close();
             wr.close();
 
             fileName = file.getName().substring(0,file.getName().indexOf('.'))
