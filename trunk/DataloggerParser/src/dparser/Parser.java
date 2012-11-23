@@ -21,8 +21,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import exceptions.PackException;
-
 /**
  * Parser written for the CalSol datalogger
  * This is the actual class that does the hard work of
@@ -73,6 +71,7 @@ public class Parser {
      * If debug is set to <b>true</b>, then this printstream will be
      * initialized. Otherwise, it will not.
      */
+    @SuppressWarnings("unused")
     private PrintStream db;
 
 
@@ -305,6 +304,7 @@ public class Parser {
                 return temp;
             }
         }
+        return null;
     }
 
     /**

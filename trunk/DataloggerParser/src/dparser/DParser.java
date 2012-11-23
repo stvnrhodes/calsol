@@ -1,22 +1,19 @@
 package dparser;
 
-import java.io.BufferedOutputStream;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintStream;
-import java.util.ArrayList;
 import java.util.Scanner;
 
 import javax.swing.JFileChooser;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+import messages.Message;
+
 import org.json.JSONException;
-import au.com.bytecode.opencsv.CSVWriter;
 
 /**
  * Parser written for the CalSol datalogger
@@ -63,7 +60,7 @@ public class DParser {
             if (returnVal == JFileChooser.APPROVE_OPTION) {
                 File file = fd.getSelectedFile();
                 try {
-                    write(file);
+                    decode(file);
                 } catch (FileNotFoundException e) {
                     /*Do nothing!*/
                     e.printStackTrace();
@@ -83,62 +80,35 @@ public class DParser {
     /**
      * Writes the parsed data into .csv and .txt files.
      * Current output is <br>
-     * <b>(filename)rawdata.csv</b>, which includes all non-error data <br>
-     * <b>(filename)errors.csv</b>, which includes all error data <br>
-     * <b>(filename)toMat.txt</b>, which includes all data to be converted
-     * later into .mat form. This may be changed in the future, so that this
-     * parser program may generate the .mat file in one shot without having
-     * to use this intermediate. <br>
+     * <b>(filename)rawdata.txt</b>, which includes all non-error data <br>
+     * <b>(filename)errors.txt</b>, which includes all error data <br>
      * <b>debug.txt</b> If the parser is set to verbose mode. This includes
      * every message sent, as a dump into a text file.
      * @param file The original file that was opened for parsing - needed
      * to get the name of the file.
      */
-    private static void write(File file) throws IOException {
+    private static void decode(File file) throws IOException {
         String fileName = file.getName().substring
-                (0,file.getName().indexOf('.'))+ "rawdata.csv";
+                (0,file.getName().indexOf('.'))+ "rawdata.txt";
         try {
             Scanner f = new Scanner(file);
-            int i = 0;
-            while (f.hasNext()) {
-                ArrayList<String> line = p.parse(f.nextLine());
-                if (i == Integer.MAX_VALUE)
-                    System.gc();
-            }
-            f.close();
             FileWriter fr = new FileWriter(new File(fileName));
             BufferedWriter output = new BufferedWriter(fr);
-            CSVWriter wr = new CSVWriter(fr);
-            String [] data = {"Timestamp", "Message", "Data"};
-            wr.writeNext(data);
+            int i = 0;
+            while (f.hasNext()) {
+                i++;
+                Message m = p.parse(f.nextLine());
+                if (i >= (Integer.MAX_VALUE >>> 10)) {
+                    System.gc();
+                    i = 0;
+                }
+                if (m != null) {
+                    output.write(m.toString());
+                }
+            }
+            f.close();
             fr.close();
-            wr.close();
-
-            fileName = file.getName().substring(0,file.getName().indexOf('.'))
-                    + "errors.csv";
-            fr = new FileWriter(new File(fileName));
-            wr = new CSVWriter(fr);
-            String [] errors = {"Timestamp", "Error Type", "Data"};
-            wr.writeNext(errors);
-            fr.close();
-            wr.close();
-
-            fileName = file.getName().substring(0,file.getName().indexOf('.'))
-                    + "toMat.txt";
-            PrintStream pr = new PrintStream(new File(fileName));
-            ArrayList<String> mat = p.getMatStrings();
-            for(int i = 0; i < mat.size(); i++)
-                pr.println(mat.get(i));
-            pr.close();
-
-            fileName = file.getName().substring(0,file.getName().indexOf('.'))
-                    + "MotorTeam.txt";
-            pr = new PrintStream(new File(fileName));
-            ArrayList<String> motorTeam = p.getMotorStrings();
-            for(int i = 0; i < motorTeam.size(); i++)
-                pr.println(motorTeam.get(i));
-            pr.close();
-
+            output.close();
         } catch (FileNotFoundException e) {
             // Do nothing!
             e.printStackTrace();
