@@ -22,7 +22,7 @@ import au.com.bytecode.opencsv.CSVWriter;
  * Parser written for the CalSol datalogger
  * @author Derek Chou
  * @since 2012.05.13
- * @version 1.1
+ * @version 1.20
  */
 
 public class DParser {

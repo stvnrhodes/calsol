@@ -15,7 +15,7 @@ import messages.Message;
 import messages.SDMessage;
 import messages.SDMount;
 import messages.VoltageMessage;
-import messages.vPerf;
+import messages.VoltagePerformance;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -30,7 +30,7 @@ import exceptions.PackException;
  * datalogger opCode first and then interprets the payload.
  * @author Derek Chou
  * @since 2012.05.13
- * @version 1.00
+ * @version 1.20
  */
 public class Parser {
 
@@ -228,7 +228,7 @@ public class Parser {
      * @param data A line of datalogger output.
      * @return An ArrayList of Strings that have been parsed.
      */
-    public ArrayList<String> parse(String data) {
+    public Message parse(String data) {
         ArrayList<String> split = new ArrayList<String>();
         String [] op = data.split("\\s");
         int opCode = -1;
@@ -245,28 +245,17 @@ public class Parser {
                     split.add(s);
             String [] sp = split.toArray(new String[split.size()]);
             Message temp = null;
-            ArrayList<String> temp2 = new ArrayList<String>();
             switch (opCode) {
             case 0:
-                temp = new Accelerometer(sp, true);
-                for (String s : temp.params()) {
-                    temp2.add(s);
-                }
-                return temp2;
+                return new Accelerometer(sp, true);
             case 1:
-                temp = new BOverflow(sp, true);
-                for (String s : temp.params()) {
-                    temp2.add(s);
-                }
-                return temp2;
+                return new BOverflow(sp, true);
             case 2:
                 boolean isError = false;
                 if (sp[2].equalsIgnoreCase("covf")
                         || sp[2].equalsIgnoreCase("movf")) {
                     isError = true;
-                    temp = new CANMessage(sp, true, isError, null);
-                    errors.add(temp);
-                    break;
+                    return new CANMessage(sp, true, isError, null);
                 } else {
                     ArrayList<String> h = decodeJSON(sp);
                     try {
@@ -281,24 +270,13 @@ public class Parser {
                         temp.setHeader(tempList);
                     }
                 }
-                for (String s : temp.params()) {
-                    temp2.add(s);
-                }
-                return temp2;
+                return temp;
             case 3:
-                temp = new CANOverflow(sp, false);
-                for (String s : temp.params()) {
-                    temp2.add(s);
-                }
-                return temp2;
+                return new CANOverflow(sp, false);
             case 4:
-                temp = new SDMessage(sp, true);
-                for (String s : temp.params()) {
-                    temp2.add(s);
-                }
-                return temp2;
+                return new SDMessage(sp, true);
                 /*
-				This will be implemented in a later version of the parser
+				Don't know if we want parameters messages later.
 				case 5:
 					try {
 						params(sp);
@@ -309,23 +287,11 @@ public class Parser {
 					break;
                  */
             case 6:
-                temp = new SDMount(sp, true);
-                for (String s : temp.params()) {
-                    temp2.add(s);
-                }
-                return temp2;
+                return new SDMount(sp, true);
             case 7:
-                temp = new vPerf(sp, true);
-                for (String s : temp.params()) {
-                    temp2.add(s);
-                }
-                return temp2;
+                return new VoltagePerformance(sp, true);
             case 8:
-                temp = new VoltageMessage(sp, true);
-                for (String s : temp.params()) {
-                    temp2.add(s);
-                }
-                return temp2;
+                return new VoltageMessage(sp, true);
                 /*
 				Don't want dismount messages as of now
 				case 9:
@@ -334,21 +300,9 @@ public class Parser {
 					break;
                  */
             case 10:
-                temp = new CTMessage(sp, true);
-                for (String s : temp.params()) {
-                    temp2.add(s);
-                }
-                return temp2;
+                return new CTMessage(sp, true);
             default:
-                break;
-            }
-            try {
-                if (debug && temp != null) {
-                    System.out.println(temp);
-                    db.println(temp);
-                }
-            } catch(NullPointerException e) {
-                /* Do absolutely nothing! */
+                return temp;
             }
         }
     }
@@ -444,11 +398,6 @@ public class Parser {
      * Garbage collection.
      */
     public void clearFields() {
-        data = new ArrayList<Message>();
-        cfg = new ArrayList<Message>();
-        errors = new ArrayList<Message>();
-        matrixIndex = new ArrayList<ArrayList<String>>();
-        matrix = new ArrayList<ArrayList<Message>>();
         dataValid = false;
     }
 }
