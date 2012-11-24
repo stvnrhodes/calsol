@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Scanner;
 
 import javax.swing.JFileChooser;
@@ -14,6 +15,8 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import messages.Message;
 
 import org.json.JSONException;
+
+import exceptions.PackException;
 
 /**
  * Parser written for the CalSol datalogger
@@ -103,11 +106,18 @@ public class DParser {
                     i = 0;
                 }
                 if (m != null) {
-                    output.write(m.toString());
+                    String [] temp = process(m);
+                    if (temp != null) {
+                        for (String s : temp) {
+                            if (s != null) {
+                                output.write(s);
+                                output.write("\r\n");
+                            }
+                        }
+                    }
                 }
             }
             f.close();
-            fr.close();
             output.close();
         } catch (FileNotFoundException e) {
             // Do nothing!
@@ -115,4 +125,25 @@ public class DParser {
         }
     }
 
+
+    /**
+     * @param m The message that we're trying to process data from.
+     * @return All data going to whomever wishes to process
+     * the Datalogger output in MATLAB.
+     */
+    public static String[] process(Message m) {
+        if (!m.hasData)
+            return null;
+        ArrayList<String> temp;
+        try {
+            temp = m.pack();
+        } catch (PackException e) {
+            return null;
+        }
+        String[] out = new String[temp.size()];
+        for (int j = 0; j < temp.size(); j++) {
+            out[j] = temp.get(j);
+        }
+        return out;
+    }
 }
