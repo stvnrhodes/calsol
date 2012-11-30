@@ -98,8 +98,10 @@ public class DParser {
             FileWriter fr = new FileWriter(new File(fileName));
             BufferedWriter output = new BufferedWriter(fr);
             int i = 0;
+            int count = 0;
             while (f.hasNext()) {
                 i++;
+                count++;
                 Message m = p.parse(f.nextLine());
                 if (i >= (Integer.MAX_VALUE >>> 10)) {
                     System.gc();
@@ -115,10 +117,14 @@ public class DParser {
                             }
                         }
                     }
+
                 }
             }
             f.close();
             output.close();
+            fr = new FileWriter(new File(fileName));
+            output = new BufferedWriter(fr);
+
         } catch (FileNotFoundException e) {
             // Do nothing!
             e.printStackTrace();
