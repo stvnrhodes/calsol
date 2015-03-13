@@ -9,7 +9,7 @@ state for several years, but the code has remained basically unchanged.
 
 ![The car](https://raw.githubusercontent.com/CalSol/Impulse/master/impulse.jpg)
 
-Each microcontroller in the car has its own folder. Most contrllers used the
+Each microcontroller in the car has its own folder. Most controllers used the
 [BRAIN](https://github.com/CalSol/BRAIN) inset into a custom board.
 
 For some more info, check it out at http://calsol.berkeley.edu/vehicles/impulse.php
