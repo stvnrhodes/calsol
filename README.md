@@ -1,4 +1,4 @@
-This repository formerly lived at https://code.google.com/p/calsolbrain/. It
+This repository formerly lived at https://code.google.com/p/calsol/. It
 was moved to github after news of Google Code's closure.
 
 The design for Impulse, CalSol's 7th car, was started in Fall 2009. It raced
