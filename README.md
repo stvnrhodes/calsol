@@ -16,3 +16,6 @@ For some more info, check it out at http://calsol.berkeley.edu/vehicles/impulse.
 
 
 
+
+
+[![Join the chat at https://gitter.im/CalSol/Impulse](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/CalSol/Impulse?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
