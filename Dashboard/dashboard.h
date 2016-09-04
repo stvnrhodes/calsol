@@ -15,6 +15,7 @@
 #define LIGHT_BLINK_PERIOD     512
 #define CRUISE_SPEED_INCREMENT 0.1
 #define CRUISE_TORQUE_SETTING  0.7
+#define SPEED_POWER_LIMIT 7.0 //m/s
 
 // The length of time to flash for the error LEDs
 #define SHORT_FLASH_TIME  80
@@ -438,7 +439,7 @@ void createDriveCommands(const states_enum state, const float accel,
         // Accelerator is not pressed
         sendDriveCommand(0.0, 0.0);
       } else {
-        sendDriveCommand(MAX_TRITIUM_SPEED, accel);
+        sendDriveCommand(MAX_TRITIUM_SPEED, min(accel,accel*SPEED_POWER_LIMIT/(abs(current_speed)+0.01)));
       }
       break;
     case REVERSE:
